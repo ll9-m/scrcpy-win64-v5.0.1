@@ -14,29 +14,12 @@ if errorlevel 1 goto no_adb
 set "ADB=adb"
 :have_adb
 
-if /i "%~1"=="--manual" goto manual
-
 echo ============================================================
 echo   scrcpy 无线配对
 echo ============================================================
-echo   1. 手机扫码配对      需要网络支持 mDNS 广播
-echo   2. 手输 6 位配对码   任何网络都能用
-echo.
-set /p MODE=直接回车 = 扫码，输入 2 = 手输配对码： 
-if /i "%MODE%"=="M" goto manual
-if "%MODE%"=="2" goto manual
-if not exist "%~dp0scripts\pair-qr.ps1" goto manual
-
-echo.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\pair-qr.ps1"
-if not errorlevel 1 goto qr_done
-echo.
-echo 扫码配对没有完成，现在改用 6 位配对码方式。
-echo.
-
-:manual
 echo 手机操作：开发者选项 - 无线调试 - 使用配对码配对设备
 echo 请填「配对」弹窗里的地址，不要填无线调试主界面的地址。
+echo.
 set /p PAIR=配对弹窗 IP:端口： 
 set /p CODE=6 位配对码： 
 if not defined PAIR goto pair_fail
@@ -79,11 +62,6 @@ echo 地址已保存到 config\phone.txt
 echo.
 set /p START=现在开始投屏吗？[Y/N]： 
 if /i "%START%"=="Y" call "%~dp0投屏.bat"
-pause
-exit /b 0
-
-:qr_done
-echo.
 pause
 exit /b 0
 

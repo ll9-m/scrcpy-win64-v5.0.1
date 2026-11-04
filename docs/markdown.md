@@ -39,7 +39,7 @@ scrcpy-win64-v5.0.1/
 ├── .gitattributes              换行与二进制属性
 ├── .gitignore                  忽略运行时状态与产物
 ├── README.md                   快速上手
-├── 配对.bat                    ① 配对入口（扫码 / 手输）
+├── 配对.bat                    ① 配对入口（输入地址 + 6 位码）
 ├── 投屏.bat                    ② 投屏入口
 ├── 等待投屏.bat                ③ 等待式投屏入口
 ├── open_a_terminal_here.bat    官方：在此处打开命令行
@@ -61,18 +61,12 @@ scrcpy-win64-v5.0.1/
 ├── config/
 │   ├── phone.txt               上次连接成功的地址（不入库）
 │   └── phone.txt.example       格式示例
-├── docs/
-│   ├── markdown.md             本文档
-│   └── LICENSE.txt             Apache 2.0
-└── scripts/
-    ├── pair-qr.ps1             扫码配对编排
-    └── lib/
-        ├── qr.js               QR 编码器（v4 / 纠错 M）
-        ├── qr.test.js          编码器往返测试
-        └── html.test.js        页面渲染测试
+└── docs/
+    ├── markdown.md             本文档
+    └── LICENSE.txt             Apache 2.0
 ```
 
-统计：根目录 5 个脚本 + 1 个文档，`bin/` 13 个，`config/` 2 个，`docs/` 2 个，`scripts/` 4 个，合计 27 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
+统计：根目录 5 个脚本 + 1 个文档，`bin/` 13 个，`config/` 2 个，`docs/` 2 个，合计 23 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
 
 ---
 
@@ -81,8 +75,6 @@ scrcpy-win64-v5.0.1/
 | 层级 | 文件 | 职责 |
 |---|---|---|
 | **入口层** | `配对.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
-| **编排层** | `scripts/pair-qr.ps1` | 扫码配对的完整状态机 |
-| **算法层** | `scripts/lib/qr.js` | 二维码编码 |
 | **主程序层** | `bin/scrcpy.exe`、`bin/scrcpy-server` | 客户端主机程序 + 设备端代理 |
 | **通信层** | `bin/adb.exe`、`AdbWinApi.dll`、`AdbWinUsbApi.dll`、`libusb-1.0.dll` | 建立 PC ↔ 手机 通道 |
 | **媒体层** | `avcodec-63.dll`、`avformat-63.dll`、`avutil-61.dll`、`swresample-7.dll` | 解码 H.264/H.265、处理音频 |
@@ -97,14 +89,15 @@ scrcpy-win64-v5.0.1/
 
 #### `配对.bat` — 配对入口
 
-- **用途**：一次性的设备配对引导，扫码为主、手输为辅。
+- **用途**：一次性的设备配对引导，只走配对码一条路径。
 - **流程**：
-  1. 定位 `bin\adb.exe`，缺失则回退 PATH 并告警，两者都没有就报错退出；
-  2. 打印模式菜单：**回车走扫码**（调用 `scripts\pair-qr.ps1`），**输入 `M` 走手输**；
-  3. 扫码返回非 0（超时 / mDNS 不可用）时自动降级到 6 位码流程，不会让人卡死；
-  4. 手输流程：`adb pair <IP:端口> <6位码>` → 等 3 秒 → 用 mDNS 嗅探真实连接端口 → `adb connect`；
+  1. 定位 `bin\adb.exe`，缺失则回退 PATH，两者都没有就报错退出；
+  2. 提示填入手机「配对」弹窗里的 `IP:端口` 与 6 位配对码，执行 `adb pair`；
+  3. 配对成功后等 3 秒，用 `adb mdns services` 嗅探 `_adb-tls-connect._tcp` 的连接端口并 `adb connect`；
+  4. 嗅探不到（校园网常见）则提示手动输入「无线调试」主界面上的 `IP:端口`；
   5. 成功后写入 `config\phone.txt`，并询问是否立刻投屏。
 - **项目角色**：**`phone.txt` 的写入方之一**（另一处是 `投屏.bat` 的连接回调）。
+- **为什么没有扫码**：扫码配对依赖手机通过 mDNS 组播公布配对端口，而校园网 / 公共 Wi-Fi 普遍过滤组播，手机端会一直转圈等不到连接。配对码走点对点 TCP，不受影响，因此只保留这条路径。
 
 #### `投屏.bat` — 投屏入口
 
@@ -161,36 +154,7 @@ scrcpy-win64-v5.0.1/
 
 读取方（`投屏.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
 
-### 4.4 脚本（`scripts/`）
-
-#### `pair-qr.ps1` — 扫码配对编排
-
-- **协议依据**（AOSP `docs/dev/adb_wifi.md`）：二维码内容为
-  `WIFI:T:ADB;S:<服务实例名>;P:<配对码>;;`
-  手机扫到 `T:ADB` 后，会以 `S` 指定的实例名广播 `_adb-tls-pairing._tcp`；主机发现后执行 `adb pair`，配对成功手机会再广播 `_adb-tls-connect._tcp` 供连接。
-- **执行序**：
-  1. **预检**：启动 adb server → `adb mdns check` 必须含 `mdns daemon version`，否则直接退出（码 3），不让人干等；
-  2. **短路**：已有网络设备在线时直接提示"无需配对"退出（码 0）；
-  3. **生成**：随机 `scrcpy-<8位hex>` 服务名 + 6 位配对码，用字符串拼接组装 payload 并做格式自检；
-  4. **渲染**：把 `lib/qr.js` 内联进本地 HTML，写明浅色主题、白底、4 模块静区、410px 画布，用默认浏览器打开；
-  5. **配对**：轮询 `adb mdns services`，优先匹配自己请求的实例名；每个地址**只尝试一次**，以输出含 `Successfully paired` 判定；失败地址永不再试（配对通道一次性，重试只会 `protocol fault`）；
-  6. **连接**：**重新发现** `_adb-tls-connect._tcp`（配对端口 ≠ 连接端口），优先同 IP 的条目，以 `adb devices` 状态为 `device` 为准；
-  7. **落盘**：写入 `config\phone.txt`，询问是否立刻投屏。
-- **退出码**：`0` 成功 / 已连接，`1` 环境问题，`2` 超时，`3` mDNS 不可用。
-
-#### `lib/qr.js` — 二维码编码器
-
-- 固定 **版本 4、纠错等级 M**（33×33，100 码字 = 2 块 × (32 数据 + 18 纠错)）。
-- 固定版本的好处：不需要版本 / 容量表，而这正是手写编码器最易出错的地方。
-- 实现包含 GF(256) 运算、Reed-Solomon 生成多项式、交织、8 种掩码 + 罚分择优、BCH(15,5) 格式信息。
-- **不联网、不依赖第三方库**，纯文本随包携带。
-
-#### `lib/qr.test.js` / `lib/html.test.js` — 自测
-
-- `qr.test.js`：从矩阵**反向解码**出原文并比对；校验两份格式信息一致且 BCH 有效；对每个 RS 块在 α⁰..α¹⁷ 上求值必须全零；断言数据区 807 位（800 数据 + 7 剩余）。
-- `html.test.js`：注入 DOM 桩**真实执行页面渲染脚本**，比对 SVG 矩形与已验证矩阵是否逐位一致。
-
-### 4.5 文档与配置
+### 4.4 文档与配置
 
 | 文件 | 说明 |
 |---|---|
@@ -198,7 +162,7 @@ scrcpy-win64-v5.0.1/
 | `docs/markdown.md` | 本文档 |
 | `docs/LICENSE.txt` | Apache 2.0 全文 |
 | `.gitignore` | 忽略 `phone.txt`、`logs/`、`*.log`、`*.zip`、`.workbuddy/` |
-| `.gitattributes` | `.bat`/`.vbs`/`.ps1` 锁 CRLF；exe/dll/png/`scrcpy-server` 标为二进制 |
+| `.gitattributes` | `.bat`/`.vbs` 锁 CRLF；exe/dll/png/`scrcpy-server` 标为二进制 |
 
 ---
 
@@ -217,17 +181,15 @@ scrcpy-win64-v5.0.1/
                  └─ SDL3 渲染 + 反向注入键鼠
 ```
 
-### 扫码配对
+### 配对
 
 ```
-配对.bat ──► pair-qr.ps1
-               ├─ adb mdns check（不可用则直接退出）
-               ├─ 生成 WIFI:T:ADB;S:<名>;P:<码>;; → HTML → 浏览器
-               ├─ 手机扫码 → 广播 _adb-tls-pairing._tcp
-               ├─ 发现 → adb pair <IP:配对端口> <码>
-               ├─ 手机再广播 _adb-tls-connect._tcp
-               ├─ adb connect <IP:连接端口>
-               └─ 写 config\phone.txt
+配对.bat
+  ├─ 输入手机「配对」弹窗的 IP:端口 + 6 位码
+  ├─ adb pair <IP:配对端口> <码>
+  ├─ adb mdns services → _adb-tls-connect._tcp（找不到则手输主界面 IP:端口）
+  ├─ adb connect <IP:连接端口>
+  └─ 写 config\phone.txt
 ```
 
 ---
@@ -236,12 +198,11 @@ scrcpy-win64-v5.0.1/
 
 1. **`scrcpy.exe` 按自身所在目录找图标和服务端**。二进制内含 `SCRCPY_ICON_DIR`、`SCRCPY_SERVER_PATH`、`Using icon (portable)`、`GetModuleFileNameW`。因此 `scrcpy-server` 必须与 exe 同目录；入口脚本已显式设置这两个环境变量，**不要依赖当前工作目录**。
 2. **`scrcpy-server` 不能换成别的版本**，它与 `scrcpy.exe` 的协议必须匹配。
-3. **配对端口 ≠ 连接端口**。`adb pair` 用的端口在配对完成后即失效，连接必须重新发现 `_adb-tls-connect._tcp` 的端口。
+3. **配对端口 ≠ 连接端口**。`adb pair` 用的端口在配对完成后即失效，连接必须换成「无线调试」主界面上的端口（脚本会先用 mDNS 自动找，找不到就让你手输）。
 
-另外两条工程约定：
+工程约定：
 
 - **`.bat` 必须存成 GBK（代码页 936）并用 CRLF 换行**。cmd 按当前代码页逐字节解码脚本，UTF-8 中文会变成乱码；每个脚本第二行都有 `chcp 936` 兜底，保证从任何终端启动都能正确解析中文文件名与中文提示。代价是只能在装了中文代码页的 Windows 上运行。
-- **`.ps1` 必须存为 UTF-8 with BOM**。PowerShell 5.1 对无 BOM 的文件按 ANSI 解析，中文会变乱码。
 
 ---
 
@@ -252,7 +213,11 @@ scrcpy-win64-v5.0.1/
 | `chore: import ... baseline` | 原始 20 个文件原样入库 |
 | `refactor: split into bin/, config/, docs/` | 目录分区 + 路径适配 + 图标 / 服务端环境变量固定 |
 | `fix: harden device discovery ...` | 设备地址校验、`phone.txt` 格式校验、跳过模拟器、adb 兜底告警、不再误杀共享 adb server |
-| `feat: pair by scanning a QR code` | 扫码配对全流程 + 自研 QR 编码器 + 自测脚本 |
+| `feat: pair by scanning a QR code` | 扫码配对全流程 + 自研 QR 编码器 + 自测脚本（**后已移除**，见下） |
+| `docs: add README ...` | 补充快速上手与排错文档 |
+| `fix: make the pairing menu explicit ...` | 菜单接受 `2`；mDNS 被拦时 20 秒告警、45 秒提前退出 |
+| `refactor: rename the entry scripts to Chinese` | 三个入口改中文名，控制台输出全部中文化 |
+| `refactor: drop QR pairing` | **删除扫码链路**：校园网 / 公共 Wi-Fi 过滤 mDNS 组播，扫码必然失败；退回纯配对码方式 |
 
 ---
 
@@ -262,5 +227,6 @@ scrcpy-win64-v5.0.1/
 |---|---|
 | 高 | 投屏参数外置到 `config/settings.bat`（分辨率、帧率、码率、录制、音频） |
 | 高 | 关键步骤写 `logs/`，失败时保留 adb 原始输出 |
+| 中 | 插一次 USB 后 `adb tcpip 5555`，把无线端口固定下来，省掉每次查端口 |
 | 中 | `config/devices.txt` 支持多设备（别名 + 地址） |
-| 中 | `tools/package.ps1` 一键生成干净 zip；`tools/shortcut.ps1` 生成带图标的桌面快捷方式 |
+| 中 | 一键生成干净 zip；生成带图标的桌面快捷方式 |
