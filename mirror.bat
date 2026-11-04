@@ -1,11 +1,15 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
-set "ADB=%~dp0adb.exe"
-set "SCRCPY=%~dp0scrcpy.exe"
+pushd "%~dp0" >nul 2>&1 || cd /d "%~dp0"
+set "BIN=%~dp0bin"
+set "ADB=%BIN%\adb.exe"
+set "SCRCPY=%BIN%\scrcpy.exe"
 if not exist "%ADB%" set "ADB=adb"
 if not exist "%SCRCPY%" set "SCRCPY=scrcpy"
-set "SAVED=%~dp0phone.txt"
+set "SAVED=%~dp0config\phone.txt"
+rem Keep icon and server lookup independent of the working directory.
+set "SCRCPY_ICON_DIR=%BIN%"
+set "SCRCPY_SERVER_PATH=%BIN%\scrcpy-server"
 set "WAIT="
 set "HINTED="
 if /i "%~1"=="--wait" set "WAIT=1"

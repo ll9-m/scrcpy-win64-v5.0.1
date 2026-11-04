@@ -1,9 +1,12 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
-set "ADB=%~dp0adb.exe"
+pushd "%~dp0" >nul 2>&1 || cd /d "%~dp0"
+set "BIN=%~dp0bin"
+set "ADB=%BIN%\adb.exe"
 if not exist "%ADB%" set "ADB=adb"
-set "SAVED=%~dp0phone.txt"
+set "SAVED=%~dp0config\phone.txt"
+set "SCRCPY_ICON_DIR=%BIN%"
+set "SCRCPY_SERVER_PATH=%BIN%\scrcpy-server"
 
 echo On phone: Developer options - Wireless debugging - Pair device with pairing code
 echo Use the IP:port shown INSIDE the pairing dialog, NOT the main Wireless debugging screen.
