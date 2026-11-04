@@ -1,18 +1,18 @@
-# 项目文件与目录说明（scrcpy-win64-v5.0.1）
+# 项目结构与文件说明
 
-> 生成时间：2026-11-04
-> 扫描范围：`D:\env\projects\scrcpy-win64-v5.0.1` 全量内容（含隐藏文件）
-> 说明性质：仅做静态梳理，未修改任何代码或配置
+> 更新时间：2026-11-04
+> 扫描范围：`D:\env\projects\scrcpy-win64-v5.0.1`
+> 本文档描述当前目录布局，脚本行为请以实际代码为准
 
 ---
 
 ## 一、项目定位
 
-这是一个 **scrcpy 5.0.1 的 Windows 64 位预编译发行包**，并在其基础上叠加了一套**本地自制的无线投屏启动脚本**。
+这是 **scrcpy 5.0.1 的 Windows 64 位预编译包**，并在其之上叠加了一套**本地自制的无线连接与投屏脚本**。
 
-- 上游项目：scrcpy（Genymobile），GitHub <https://github.com/Genymobile/scrcpy>
-- 许可证：Apache License 2.0
-- 依赖版本（由 `scrcpy.exe --version` 实测）：
+- 上游项目：scrcpy（Genymobile），<https://github.com/Genymobile/scrcpy>
+- 许可证：Apache License 2.0（见 `docs/LICENSE.txt`）
+- 运行时依赖（`bin\scrcpy.exe --version` 实测）：
 
 | 依赖 | 编译版本 | 链接版本 |
 |---|---|---|
@@ -22,263 +22,245 @@
 | libavutil | 61.1.102 | 61.1.102 |
 | libusb | — | 1.0.30 |
 
-- ADB 版本：`Android Debug Bridge 1.0.41 / 37.0.1-15733141`
+- ADB 版本：`1.0.41 / 37.0.1-15733141`
 
-**关键特征：**
+**三个基本特征：**
 
-1. **没有源码、没有构建系统**。不存在 `.java` / `.c` / `CMakeLists.txt` / `meson.build` / `package.json` 等，本项目不是"开发工程"，而是"运行时部署目录"。
-2. **没有版本控制**。目录下不存在 `.git`。
-3. **完全扁平**。所有文件直接位于根目录，**没有任何子目录**。
-4. **改动痕迹集中**。上游文件时间戳统一为 `2025-10-08 14:27`；而 `mirror.bat`、`pair.bat`、`mirror-wait.bat`、`phone.txt` 的时间戳为 `2026-11-04`，说明这四个文件是本地新增 / 二次开发的产物，其余为原封不动的官方发行文件。
-
----
-
-## 二、目录结构总览
-
-```
-scrcpy-win64-v5.0.1/                 ← 项目根目录（唯一目录，同时是运行时工作目录）
-├── scrcpy.exe                       ← 主程序
-├── scrcpy-server                    ← 推送到手机的设备端服务（JAR，无扩展名）
-├── adb.exe                          ← Android 调试桥
-├── AdbWinApi.dll                    ← ADB Windows API 转发库
-├── AdbWinUsbApi.dll                 ← ADB USB 传输库
-├── SDL3.dll                         ← 窗口 / 输入 / 音频 抽象层
-├── avcodec-63.dll                   ← FFmpeg 编解码
-├── avformat-63.dll                  ← FFmpeg 容器 / 流解析
-├── avutil-61.dll                    ← FFmpeg 公共工具
-├── swresample-7.dll                 ← FFmpeg 音频重采样
-├── libusb-1.0.dll                   ← USB 设备访问
-├── mirror.bat                       ← 【本地】一键无线投屏（核心脚本）
-├── pair.bat                         ← 【本地】无线调试配对 + 首次连接
-├── mirror-wait.bat                  ← 【本地】带重试等待的投屏启动器
-├── phone.txt                        ← 【本地】已保存的手机无线地址
-├── open_a_terminal_here.bat         ← 官方：在此处打开终端
-├── scrcpy-noconsole.vbs             ← 官方：无控制台窗口启动
-├── LICENSE.txt                      ← Apache 2.0 许可证
-├── scrcpy.png                       ← 程序图标
-└── disconnected.png                 ← 断开连接占位图
-```
-
-**文件统计：** 共 20 个文件，0 个子目录，总体积约 **25.6 MB**（其中 DLL/EXE 占 24.9 MB，脚本与配置合计不足 6 KB）。
+1. **没有源码、没有构建系统**。不存在 `.java` / `.c` / `CMakeLists.txt` / `package.json`，这不是开发工程，而是运行时部署目录。
+2. **绿色免安装**。不用注册表、不写 `%APPDATA%`，整个文件夹复制到任何位置都能跑。
+3. **目录分区而非功能重构**。`bin/` 之外的一切都是脚本，功能只由脚本决定。
 
 ---
 
-## 三、按功能分层的角色划分
+## 二、目录结构
 
-| 层级 | 文件 | 说明 |
+```
+scrcpy-win64-v5.0.1/
+├── .gitattributes              换行与二进制属性
+├── .gitignore                  忽略运行时状态与产物
+├── README.md                   快速上手
+├── pair.bat                    ① 配对入口（扫码 / 手输）
+├── mirror.bat                  ② 投屏入口
+├── mirror-wait.bat             ③ 等待式投屏入口
+├── open_a_terminal_here.bat    官方：在此处打开命令行
+├── scrcpy-noconsole.vbs        官方：无控制台窗口启动
+├── bin/                        程序本体（13 个文件）
+│   ├── scrcpy.exe
+│   ├── scrcpy-server
+│   ├── adb.exe
+│   ├── AdbWinApi.dll
+│   ├── AdbWinUsbApi.dll
+│   ├── SDL3.dll
+│   ├── avcodec-63.dll
+│   ├── avformat-63.dll
+│   ├── avutil-61.dll
+│   ├── swresample-7.dll
+│   ├── libusb-1.0.dll
+│   ├── scrcpy.png
+│   └── disconnected.png
+├── config/
+│   ├── phone.txt               上次连接成功的地址（不入库）
+│   └── phone.txt.example       格式示例
+├── docs/
+│   ├── markdown.md             本文档
+│   └── LICENSE.txt             Apache 2.0
+└── scripts/
+    ├── pair-qr.ps1             扫码配对编排
+    └── lib/
+        ├── qr.js               QR 编码器（v4 / 纠错 M）
+        ├── qr.test.js          编码器往返测试
+        └── html.test.js        页面渲染测试
+```
+
+统计：根目录 5 个脚本 + 1 个文档，`bin/` 13 个，`config/` 2 个，`docs/` 2 个，`scripts/` 4 个，合计 27 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
+
+---
+
+## 三、按层划分角色
+
+| 层级 | 文件 | 职责 |
 |---|---|---|
-| **入口层** | `mirror.bat`、`pair.bat`、`mirror-wait.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户实际双击 / 调用的对象 |
-| **主程序层** | `scrcpy.exe`、`scrcpy-server` | 客户端主机程序 + 设备端代理 |
-| **设备通信层** | `adb.exe`、`AdbWinApi.dll`、`AdbWinUsbApi.dll`、`libusb-1.0.dll` | 建立 PC↔手机 通道 |
-| **媒体处理层** | `avcodec-63.dll`、`avformat-63.dll`、`avutil-61.dll`、`swresample-7.dll` | 解码 H.264/H.265 视频流、处理音频 |
-| **呈现层** | `SDL3.dll` | 开窗、渲染、键鼠 / 触控事件映射 |
-| **状态层** | `phone.txt` | 跨次运行持久化的设备地址 |
-| **元数据层** | `LICENSE.txt`、`scrcpy.png`、`disconnected.png` | 许可与图形资源 |
+| **入口层** | `pair.bat`、`mirror.bat`、`mirror-wait.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
+| **编排层** | `scripts/pair-qr.ps1` | 扫码配对的完整状态机 |
+| **算法层** | `scripts/lib/qr.js` | 二维码编码 |
+| **主程序层** | `bin/scrcpy.exe`、`bin/scrcpy-server` | 客户端主机程序 + 设备端代理 |
+| **通信层** | `bin/adb.exe`、`AdbWinApi.dll`、`AdbWinUsbApi.dll`、`libusb-1.0.dll` | 建立 PC ↔ 手机 通道 |
+| **媒体层** | `avcodec-63.dll`、`avformat-63.dll`、`avutil-61.dll`、`swresample-7.dll` | 解码 H.264/H.265、处理音频 |
+| **呈现层** | `SDL3.dll` | 开窗、渲染、键鼠事件映射 |
+| **状态层** | `config/phone.txt` | 跨次运行持久化设备地址 |
 
 ---
 
-## 四、逐文件详细说明
+## 四、逐文件说明
 
-### 4.1 核心可执行程序
+### 4.1 入口脚本（根目录）
 
-#### `scrcpy.exe` — 主程序（766,717 B / 749 KB）
+#### `pair.bat` — 配对入口
 
-- **用途**：整个项目的运行主体，Windows 客户端。
-- **主要职责**：
-  1. 通过 ADB 与手机建立连接，把 `scrcpy-server` 推送到设备并拉起；
-  2. 协商视频 / 音频编码参数（分辨率、帧率、码率、编码器）；
-  3. 接收设备端回传的 H.264/H.265 裸流，交给 FFmpeg 解码；
-  4. 用 SDL3 渲染画面，并把本机键盘、鼠标、剪贴板事件反向注入手机。
-- **项目角色**：**唯一真正的业务程序**，其余脚本和 DLL 都是为它服务或由它加载。
+- **用途**：一次性的设备配对引导，扫码为主、手输为辅。
+- **流程**：
+  1. 定位 `bin\adb.exe`，缺失则回退 PATH 并告警，两者都没有就报错退出；
+  2. 打印模式菜单：**回车走扫码**（调用 `scripts\pair-qr.ps1`），**输入 `M` 走手输**；
+  3. 扫码返回非 0（超时 / mDNS 不可用）时自动降级到 6 位码流程，不会让人卡死；
+  4. 手输流程：`adb pair <IP:端口> <6位码>` → 等 3 秒 → 用 mDNS 嗅探真实连接端口 → `adb connect`；
+  5. 成功后写入 `config\phone.txt`，并询问是否立刻投屏。
+- **项目角色**：**`phone.txt` 的写入方之一**（另一处是 `mirror.bat` 的连接回调）。
 
-#### `scrcpy-server` — 设备端服务（733,930 B / 717 KB）
+#### `mirror.bat` — 投屏入口
 
-- **用途**：运行在 Android 手机上的 Java 服务端进程（实测文件头为 `PK\x03\x04`，是 JAR 包，只是刻意去掉了 `.jar` 扩展名）。
-- **主要职责**：
-  1. 调用 Android `MediaCodec` 硬件编码屏幕内容，输出视频流；
-  2. 采集音频（Android 11+ 支持内录）；
-  3. 通过本地 socket 接收客户端传来的控制指令并注入触摸 / 按键事件。
-- **项目角色**：**服务端半边天**。每次启动时由 `scrcpy.exe` 临时推送到 `/data/local/tmp/` 下执行，运行结束即释放，不常驻手机。
-- **注意**：此文件版本必须与 `scrcpy.exe` 严格匹配，不可单独替换。
+- **用途**：日常一键投屏。
+- **设备发现顺序**（四级回退）：
+  1. `adb devices` 中带 `:` 的网络设备（跳过 `emulator-*`）；
+  2. 普通 USB 设备；
+  3. `config\phone.txt` 里保存的地址（**校验必须是 `IPv4:端口`**，防止 BOM / 空行污染）；
+  4. `adb mdns services` 中的 `_adb-tls-connect._tcp`。
+- **启动参数**：`--max-size=1280 --max-fps=60 --keep-active --always-on-top`（目前硬编码）。
+- **`--wait`**：进入轮询模式，每约 15 秒重试一次，供 `mirror-wait.bat` 使用。
+- **项目角色**：**主流程编排器**，整个项目的控制流都在这里。
 
-### 4.2 设备通信层（ADB 与 USB）
+#### `mirror-wait.bat` — 等待式启动
 
-| 文件 | 大小 | 用途与职责 | 项目角色 |
-|---|---|---|---|
-| `adb.exe` | 8,273,560 B (7.9 MB) | Android Debug Bridge 命令行工具。负责设备发现、TCP/IP 连接、无线配对（`adb pair`）、mDNS 服务发现（`adb mdns services`）、端口转发、shell 命令下发、文件推送。版本 1.0.41 / 37.0.1 | **全部脚本的通信底座**。`pair.bat` 与 `mirror.bat` 的每一条命令都依赖它 |
-| `AdbWinApi.dll` | 108,184 B | ADB 的 Windows 平台抽象层，封装 Win32 句柄、事件、进程操作 | `adb.exe` 的必需依赖，缺失则 adb 无法启动 |
-| `AdbWinUsbApi.dll` | 73,368 B | ADB 的 Windows USB 传输实现，负责 USB 端点读写与驱动交互 | 仅在有线 USB 连接时需要；纯无线场景不参与 |
-| `libusb-1.0.dll` | 227,005 B | 跨平台 USB 库，供 `scrcpy.exe` 直接访问 USB 设备（绕过 adb 的 USB 直连模式） | 支撑 `--otg` 等 USB 直连能力；常规投屏不加载 |
+- **内容**：新开窗口执行 `mirror.bat --wait`。
+- **用途**：适合"先开脚本，再去手机开无线调试"的习惯。
 
-**分层关系**：`pair.bat` / `mirror.bat` → `adb.exe` → `AdbWinApi.dll` + `AdbWinUsbApi.dll` → 手机。
+#### `open_a_terminal_here.bat` — 开终端（官方）
 
-### 4.3 媒体与呈现层（DLL）
+- 内容仅 `@cmd`，双击即在当前目录打开命令行。
 
-| 文件 | 大小 | 用途与职责 | 项目角色 |
-|---|---|---|---|
-| `SDL3.dll` | 5,384,859 B (5.1 MB) | Simple DirectMedia Layer 3。提供窗口创建、GPU/软件渲染、纹理上传、键鼠与手柄事件、音频输出、剪贴板 | **画面与交互的承载者**；也是 `--always-on-top`、全屏、缩放等窗口行为的实现基础 |
-| `avcodec-63.dll` | 8,685,568 B (8.3 MB) | FFmpeg 编解码库。把手机传来的 H.264/H.265 码流解码为原始 YUV/RGB 帧 | 体积最大的文件，**视频解码核心** |
-| `avformat-63.dll` | 743,424 B | FFmpeg 容器与流格式解析，处理流封装、时间戳、`--record` 录制时的封装输出 | 流解析与录制支持 |
-| `avutil-61.dll` | 1,047,552 B | FFmpeg 公共工具库：内存、数学、像素格式、帧缓冲管理 | `avcodec` / `avformat` / `swresample` 的公共依赖 |
-| `swresample-7.dll` | 139,776 B | FFmpeg 音频重采样与声道转换，把设备音频转成本机声卡可播放的格式 | 仅在启用音频转发（`--audio`）时实际生效 |
+#### `scrcpy-noconsole.vbs` — 无窗口启动（官方改造）
 
-> 版本号后缀（63 / 61 / 7）对应 FFmpeg 的大版本 ABI，**不可跨版本混用**；四个库必须来自同一发行包。
+- 用 `WScript.Shell.Run(..., 0, false)` 隐藏窗口启动 `bin\scrcpy.exe`，参数原样转义转发。
+- **已改造**：原版直接执行 `cmd /c scrcpy.exe`，依赖 exe 在当前目录；分区后改为按脚本自身路径拼出 `bin\scrcpy.exe`，并把工作目录设为包根目录。
 
-### 4.4 本地自制脚本（本次项目的实质性增量）
+### 4.2 程序本体（`bin/`）
 
-这四个文件是相对官方发行包**新增或改造**的部分，也是后续最可能需要改动的地方。
+| 文件 | 大小 | 职责 |
+|---|---|---|
+| `scrcpy.exe` | 749 KB | 主程序：推送服务端、协商编码、接收码流、渲染、注入事件 |
+| `scrcpy-server` | 717 KB | 手机端 JAR（刻意无扩展名），用 MediaCodec 编码屏幕并回传；版本必须与 exe 严格匹配 |
+| `adb.exe` | 7.9 MB | 设备发现、无线配对、mDNS 查询、端口转发、文件推送 |
+| `AdbWinApi.dll` | 106 KB | ADB 的 Win32 抽象层，缺失则 adb 无法启动 |
+| `AdbWinUsbApi.dll` | 72 KB | ADB 的 USB 传输实现，纯无线场景不参与 |
+| `SDL3.dll` | 5.1 MB | 窗口、渲染、输入、音频、剪贴板 |
+| `avcodec-63.dll` | 8.3 MB | 视频解码核心 |
+| `avformat-63.dll` | 726 KB | 流解析与录制封装 |
+| `avutil-61.dll` | 1.0 MB | FFmpeg 公共工具 |
+| `swresample-7.dll` | 137 KB | 音频重采样，仅开音频时生效 |
+| `libusb-1.0.dll` | 222 KB | USB 直连（`--otg` 等），常规投屏不加载 |
+| `scrcpy.png` | 6.4 KB | 窗口 / 任务栏图标 |
+| `disconnected.png` | 4.6 KB | 断开连接时的占位画面 |
 
-#### `mirror.bat` — 一键无线投屏（2,389 B）
+> FFmpeg 四个库的版本后缀（63 / 61 / 7）对应 ABI，**必须来自同一发行包，不可混用**。
 
-- **用途**：核心启动脚本，自动找到手机并开窗投屏，用户无需记参数。
-- **主要职责**（按执行顺序）：
-  1. **环境自愈**：`cd /d "%~dp0"` 锁定工作目录；优先使用同目录的 `adb.exe` / `scrcpy.exe`，不存在则回退到系统 `PATH`。
-  2. **设备发现（`:discover` 段）**：遍历 `adb devices` 输出，分三类处理——
-     - 带 `:` 的序列号 → 视为网络设备，立即采用（无线优先）；
-     - 无 `:` 的 `device` → 记为 USB 备选；
-     - `unauthorized` / `offline` → 打标记，供后续给出针对性提示。
-  3. **回退链**：`USB 设备` → `phone.txt` 中保存的地址`（adb connect）` → `adb mdns services` 中查找 `_adb-tls-connect._tcp` 记录。
-  4. **等待模式**：传入 `--wait` 时进入轮询（`ping -n 16` 约 15 秒一轮），并在首次遇到未授权 / 离线时打印一次提示，而不是直接退出。
-  5. **失败处理**：非等待模式下打印三条排查建议，等 5 秒后 `adb kill-server` 清理残留进程，返回退出码 1。
-  6. **启动（`:run` 段）**：以固定参数拉起 scrcpy——
-     ```bat
-     scrcpy -s <SERIAL> --max-size=1280 --max-fps=60 --keep-active --always-on-top
-     ```
-     含义：限制最长边 1280 px（省带宽、保流畅）、上限 60 fps、保持手机不休眠、窗口置顶。
-  7. **收尾**：scrcpy 退出后 `adb kill-server`，避免 adb 后台进程残留。
-- **项目角色**：**用户入口 + 连接编排器**。整个项目的"控制流"都在这里。
+### 4.3 状态（`config/`）
 
-#### `pair.bat` — 无线调试配对（2,454 B）
+| 文件 | 说明 |
+|---|---|
+| `phone.txt` | 单行 `IP:端口`，每次连接成功后被重写；已加入 `.gitignore` |
+| `phone.txt.example` | 格式示例，供参考 |
 
-- **用途**：解决 Android 11+ "无线调试"首次连接必须配对的问题。
-- **主要职责**：
-  1. 提示用户输入**配对对话框**里的 `IP:port` 与 6 位配对码；
-  2. 执行 `adb pair <IP:port> <code>`，失败时给出针对性诊断（尤其是"误用主界面端口导致 protocol fault"这一常见坑）；
-  3. 配对成功后等待 3 秒，用 `adb mdns services` 自动嗅探 `_adb-tls-connect._tcp` 的真实连接端口并自动 `adb connect`；
-  4. 自动连接失败则回退为手动输入主界面 `IP:port`；
-  5. 成功后把地址写入 `phone.txt`，并询问是否立即调用 `mirror.bat` 开始投屏。
-- **项目角色**：**首次使用的一次性引导器**，同时是 `phone.txt` 的**唯一生产者**（写入方）。
+读取方（`mirror.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
 
-#### `mirror-wait.bat` — 带等待的启动器（80 B）
+### 4.4 脚本（`scripts/`）
 
-- **内容**：`start "scrcpy" cmd /c "mirror.bat --wait"`
-- **用途**：不阻塞当前窗口，新开一个命令行窗口运行 `mirror.bat --wait`，即"一直等到手机出现为止"。
-- **项目角色**：**便利封装**。适合"先开脚本、后开手机无线调试"的使用习惯。
+#### `pair-qr.ps1` — 扫码配对编排
 
-#### `phone.txt` — 设备地址缓存（20 B）
+- **协议依据**（AOSP `docs/dev/adb_wifi.md`）：二维码内容为
+  `WIFI:T:ADB;S:<服务实例名>;P:<配对码>;;`
+  手机扫到 `T:ADB` 后，会以 `S` 指定的实例名广播 `_adb-tls-pairing._tcp`；主机发现后执行 `adb pair`，配对成功手机会再广播 `_adb-tls-connect._tcp` 供连接。
+- **执行序**：
+  1. **预检**：启动 adb server → `adb mdns check` 必须含 `mdns daemon version`，否则直接退出（码 3），不让人干等；
+  2. **短路**：已有网络设备在线时直接提示"无需配对"退出（码 0）；
+  3. **生成**：随机 `scrcpy-<8位hex>` 服务名 + 6 位配对码，用字符串拼接组装 payload 并做格式自检；
+  4. **渲染**：把 `lib/qr.js` 内联进本地 HTML，写明浅色主题、白底、4 模块静区、410px 画布，用默认浏览器打开；
+  5. **配对**：轮询 `adb mdns services`，优先匹配自己请求的实例名；每个地址**只尝试一次**，以输出含 `Successfully paired` 判定；失败地址永不再试（配对通道一次性，重试只会 `protocol fault`）；
+  6. **连接**：**重新发现** `_adb-tls-connect._tcp`（配对端口 ≠ 连接端口），优先同 IP 的条目，以 `adb devices` 状态为 `device` 为准；
+  7. **落盘**：写入 `config\phone.txt`，询问是否立刻投屏。
+- **退出码**：`0` 成功 / 已连接，`1` 环境问题，`2` 超时，`3` mDNS 不可用。
 
-- **内容**：`10.66.209.39:33751`（当前记录的无线调试连接地址）
-- **用途**：持久化上一次成功连接的 `IP:port`，让 `mirror.bat` 在 mDNS 失效（如路由器禁用组播）时仍能直连。
-- **项目角色**：**状态文件 / 缓存**。由 `pair.bat` 和 `mirror.bat` 的 `:connect` 段写入，由 `mirror.bat` 读取。
-- **注意**：无线调试端口每次重开通常会变化，此文件可能过期——脚本已用 mDNS 作为后备来兜底。
+#### `lib/qr.js` — 二维码编码器
 
-### 4.5 官方附带的辅助文件
+- 固定 **版本 4、纠错等级 M**（33×33，100 码字 = 2 块 × (32 数据 + 18 纠错)）。
+- 固定版本的好处：不需要版本 / 容量表，而这正是手写编码器最易出错的地方。
+- 实现包含 GF(256) 运算、Reed-Solomon 生成多项式、交织、8 种掩码 + 罚分择优、BCH(15,5) 格式信息。
+- **不联网、不依赖第三方库**，纯文本随包携带。
 
-| 文件 | 大小 | 用途与职责 | 项目角色 |
-|---|---|---|---|
-| `open_a_terminal_here.bat` | 5 B | 内容仅 `@cmd`，双击即在当前目录打开命令提示符 | 官方便利脚本，方便手动敲 scrcpy 参数 |
-| `scrcpy-noconsole.vbs` | 212 B | VBScript，用 `WScript.Shell.Run(..., 0, false)` 以隐藏窗口方式启动 `scrcpy.exe`，并把收到的参数原样转义转发 | 消除黑色控制台窗口，纯 GUI 体验 |
-| `LICENSE.txt` | 11,387 B | Apache License 2.0 全文 | 法律合规文件，分发时必须保留 |
-| `scrcpy.png` | 6,530 B | scrcpy 官方图标（用于快捷方式、任务栏识别） | 品牌 / 图形资源 |
-| `disconnected.png` | 4,703 B | 设备断开时显示的占位图 | 运行时 UI 资源，由 `scrcpy.exe` 内嵌引用 |
+#### `lib/qr.test.js` / `lib/html.test.js` — 自测
+
+- `qr.test.js`：从矩阵**反向解码**出原文并比对；校验两份格式信息一致且 BCH 有效；对每个 RS 块在 α⁰..α¹⁷ 上求值必须全零；断言数据区 807 位（800 数据 + 7 剩余）。
+- `html.test.js`：注入 DOM 桩**真实执行页面渲染脚本**，比对 SVG 矩形与已验证矩阵是否逐位一致。
+
+### 4.5 文档与配置
+
+| 文件 | 说明 |
+|---|---|
+| `README.md` | 快速上手、常见问题 |
+| `docs/markdown.md` | 本文档 |
+| `docs/LICENSE.txt` | Apache 2.0 全文 |
+| `.gitignore` | 忽略 `phone.txt`、`logs/`、`*.log`、`*.zip`、`.workbuddy/` |
+| `.gitattributes` | `.bat`/`.vbs`/`.ps1` 锁 CRLF；exe/dll/png/`scrcpy-server` 标为二进制 |
 
 ---
 
-## 五、运行时调用链路
+## 五、运行时链路
+
+### 投屏
 
 ```
-                    ┌──────────────────────────────────────────┐
-   用户双击 ───────► │ pair.bat        （首次：配对 + 连接）      │
-                    │ mirror.bat      （日常：直接投屏）        │
-                    │ mirror-wait.bat （日常：等待手机出现）    │
-                    └───────────────┬──────────────────────────┘
-                                    │
-                     ┌──────────────┴───────────────┐
-                     ▼                              ▼
-             读 / 写 phone.txt              调用 adb.exe
-             （地址缓存）                          │
-                                    ┌────────────┴────────────┐
-                                    ▼                         ▼
-                            adb devices / connect      adb pair / mdns
-                                    │
-                                    ▼
-                            scrcpy.exe ──推送──► scrcpy-server（手机端执行）
-                                    │
-                    ┌───────────────┼────────────────┐
-                    ▼               ▼                ▼
-              SDL3.dll      avcodec/avformat     libusb-1.0.dll
-             （窗口渲染）    （视频解码）          （USB 直连，可选）
+mirror.bat
+  └─ adb devices ──► 网络设备 / USB 设备
+       ├─ 无 → config\phone.txt（校验后 adb connect）
+       └─ 无 → adb mdns services → _adb-tls-connect._tcp
+            └─ scrcpy.exe -s <serial> --max-size=1280 ...
+                 ├─ 推送 scrcpy-server 到手机并启动
+                 ├─ FFmpeg 解码 ◄── 手机 MediaCodec 编码
+                 └─ SDL3 渲染 + 反向注入键鼠
 ```
 
-**一次完整投屏的时序：**
+### 扫码配对
 
-1. 脚本解析 `adb devices` / `phone.txt` / mDNS，确定目标序列号；
-2. 若无连接，`adb connect <IP:port>` 建立 TCP 通道；
-3. `scrcpy.exe` 把 `scrcpy-server` 推送到手机并启动；
-4. 服务端用 MediaCodec 编码屏幕 → 客户端 FFmpeg 解码 → SDL3 渲染；
-5. 用户键鼠事件经反向通道注入手机；
-6. 退出时 `adb kill-server` 清理。
-
----
-
-## 六、目录层面的说明
-
-| 目录 | 性质 | 职责与角色 |
-|---|---|---|
-| `scrcpy-win64-v5.0.1\`（根目录） | 唯一的物理目录 | **同时承担三重身份**：① 程序安装目录（EXE/DLL 同级，Windows 按 exe 所在目录搜索依赖 DLL）；② 运行时工作目录（脚本用 `cd /d "%~dp0"` 强制锁定，保证相对路径可靠）；③ 配置存储位置（`phone.txt` 与之同级） |
-
-**没有子目录**这一事实本身值得注意，它带来两个直接后果：
-
-- **优点**：绿色免安装，整个目录可整体复制 / 迁移 / 打包，不写注册表、不依赖 `%APPDATA%`。
-- **约束**：所有新增资源（日志、截图、录屏、配置）若直接落在根目录会与程序文件混杂；后续若要扩展，建议新建 `logs/`、`recordings/`、`config/` 等子目录并同步修改脚本。
+```
+pair.bat ──► pair-qr.ps1
+               ├─ adb mdns check（不可用则直接退出）
+               ├─ 生成 WIFI:T:ADB;S:<名>;P:<码>;; → HTML → 浏览器
+               ├─ 手机扫码 → 广播 _adb-tls-pairing._tcp
+               ├─ 发现 → adb pair <IP:配对端口> <码>
+               ├─ 手机再广播 _adb-tls-connect._tcp
+               ├─ adb connect <IP:连接端口>
+               └─ 写 config\phone.txt
+```
 
 ---
 
-## 七、文件清单速查表
+## 六、三条硬约束（改动前必读）
 
-| # | 文件名 | 类型 | 大小 | 修改时间 | 来源 | 一句话角色 |
-|---|---|---|---|---|---|---|
-| 1 | `scrcpy.exe` | 可执行 | 749 KB | 2025-10-08 | 官方 | 主程序，投屏与控制的实现者 |
-| 2 | `scrcpy-server` | JAR（无扩展名） | 717 KB | 2025-10-08 | 官方 | 手机端编码与注入服务 |
-| 3 | `adb.exe` | 可执行 | 7.9 MB | 2025-10-08 | 官方 | 设备通信底座 |
-| 4 | `AdbWinApi.dll` | 动态库 | 106 KB | 2025-10-08 | 官方 | ADB 的 Win32 抽象层 |
-| 5 | `AdbWinUsbApi.dll` | 动态库 | 72 KB | 2025-10-08 | 官方 | ADB 的 USB 传输实现 |
-| 6 | `SDL3.dll` | 动态库 | 5.1 MB | 2025-10-08 | 官方 | 窗口、渲染、输入、音频 |
-| 7 | `avcodec-63.dll` | 动态库 | 8.3 MB | 2025-10-08 | 官方 | 视频解码核心 |
-| 8 | `avformat-63.dll` | 动态库 | 726 KB | 2025-10-08 | 官方 | 流解析与录制封装 |
-| 9 | `avutil-61.dll` | 动态库 | 1.0 MB | 2025-10-08 | 官方 | FFmpeg 公共工具 |
-| 10 | `swresample-7.dll` | 动态库 | 137 KB | 2025-10-08 | 官方 | 音频重采样 |
-| 11 | `libusb-1.0.dll` | 动态库 | 222 KB | 2025-10-08 | 官方 | USB 设备直连 |
-| 12 | `mirror.bat` | 脚本 | 2.3 KB | 2026-11-04 | **本地** | 一键投屏主控脚本 |
-| 13 | `pair.bat` | 脚本 | 2.4 KB | 2026-11-04 | **本地** | 无线配对与首次连接 |
-| 14 | `mirror-wait.bat` | 脚本 | 80 B | 2026-11-04 | **本地** | 新窗口等待式启动 |
-| 15 | `phone.txt` | 配置 | 20 B | 2026-11-04 | **本地** | 上次成功的无线地址 |
-| 16 | `open_a_terminal_here.bat` | 脚本 | 5 B | 2025-10-08 | 官方 | 在当前目录开终端 |
-| 17 | `scrcpy-noconsole.vbs` | 脚本 | 212 B | 2025-10-08 | 官方 | 无控制台窗口启动 |
-| 18 | `LICENSE.txt` | 文本 | 11 KB | 2025-10-08 | 官方 | Apache 2.0 许可证 |
-| 19 | `scrcpy.png` | 图片 | 6.4 KB | 2025-10-08 | 官方 | 程序图标 |
-| 20 | `disconnected.png` | 图片 | 4.6 KB | 2025-10-08 | 官方 | 断开连接占位图 |
+1. **`scrcpy.exe` 按自身所在目录找图标和服务端**。二进制内含 `SCRCPY_ICON_DIR`、`SCRCPY_SERVER_PATH`、`Using icon (portable)`、`GetModuleFileNameW`。因此 `scrcpy-server` 必须与 exe 同目录；入口脚本已显式设置这两个环境变量，**不要依赖当前工作目录**。
+2. **`scrcpy-server` 不能换成别的版本**，它与 `scrcpy.exe` 的协议必须匹配。
+3. **配对端口 ≠ 连接端口**。`adb pair` 用的端口在配对完成后即失效，连接必须重新发现 `_adb-tls-connect._tcp` 的端口。
+
+另外两条工程约定：
+
+- **`.bat` 内只用 ASCII**。cmd 按 OEM 代码页逐字节读脚本，写入 UTF-8 中文会乱码，`chcp 65001` 又会破坏后续解析。中文提示只放在 `.ps1` 里。
+- **`.ps1` 必须存为 UTF-8 with BOM**。PowerShell 5.1 对无 BOM 的文件按 ANSI 解析，中文会变乱码。
 
 ---
 
-## 八、当前状态与可扩展点（仅观察，不做改动）
+## 七、版本历史
 
-**观察结论：**
-
-1. 项目可正常运行 —— `scrcpy.exe --version` 与 `adb.exe version` 均能正常输出版本，DLL 依赖完整，无缺失。
-2. 本地脚本已成型：`pair.bat` 负责配对、`phone.txt` 缓存地址、`mirror.bat` 负责连接与启动，三者形成完整的"配对 → 记忆 → 复用"闭环。
-3. `mirror.bat` 中 scrcpy 参数为硬编码（`1280 / 60fps / keep-active / always-on-top`），没有外部配置入口，也没有错误日志落盘。
-
-**天然的可扩展位置（供后续需求参考）：**
-
-| 位置 | 现状 | 可扩展方向 |
-|---|---|---|
-| `mirror.bat` 第 85–88 行 | 投屏参数写死在命令行 | 抽成 `config.bat` 或命令行开关（分辨率、帧率、码率、是否录音、是否录制） |
-| `mirror.bat` 失败分支 | 仅 `echo` 提示到屏幕 | 追加写入 `logs\`，便于事后排查 |
-| `phone.txt` | 单一地址、纯文本 | 支持多设备（一行一个，带别名 / 序列号） |
-| 根目录 | 全部文件混放 | 新增 `logs\`、`recordings\`、`config\` 子目录 |
-| 启动方式 | 仅 `.bat`（会留黑窗） | 结合 `scrcpy-noconsole.vbs` 思路做静默启动 |
+| 提交 | 内容 |
+|---|---|
+| `chore: import ... baseline` | 原始 20 个文件原样入库 |
+| `refactor: split into bin/, config/, docs/` | 目录分区 + 路径适配 + 图标 / 服务端环境变量固定 |
+| `fix: harden device discovery ...` | 设备地址校验、`phone.txt` 格式校验、跳过模拟器、adb 兜底告警、不再误杀共享 adb server |
+| `feat: pair by scanning a QR code` | 扫码配对全流程 + 自研 QR 编码器 + 自测脚本 |
 
 ---
 
-*本文档为静态分析产物，未对项目做任何代码修改。等待后续具体需求。*
+## 八、待办（下一步方向）
+
+| 优先级 | 内容 |
+|---|---|
+| 高 | 投屏参数外置到 `config/settings.bat`（分辨率、帧率、码率、录制、音频） |
+| 高 | 关键步骤写 `logs/`，失败时保留 adb 原始输出 |
+| 中 | `config/devices.txt` 支持多设备（别名 + 地址） |
+| 中 | `tools/package.ps1` 一键生成干净 zip；`tools/shortcut.ps1` 生成带图标的桌面快捷方式 |
