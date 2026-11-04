@@ -1,0 +1,13 @@
+# 批处理 / 脚本必须保持 CRLF，否则 cmd 解析多行块与 goto 标签可能异常
+*.bat text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制，禁止任何换行转换
+*.exe binary
+*.dll binary
+*.png binary
+*.jar binary
+# scrcpy-server 没有扩展名，必须显式声明
+scrcpy-server binary

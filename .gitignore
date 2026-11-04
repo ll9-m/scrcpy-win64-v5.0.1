@@ -1,0 +1,13 @@
+# 运行时状态：每次成功连接都会被重写，不入库
+phone.txt
+config/phone.txt
+
+# 日志
+logs/
+*.log
+
+# 打包产物
+*.zip
+
+# Agent 工作目录
+.workbuddy/
