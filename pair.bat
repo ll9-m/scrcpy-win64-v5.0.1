@@ -3,11 +3,37 @@ setlocal EnableExtensions
 pushd "%~dp0" >nul 2>&1 || cd /d "%~dp0"
 set "BIN=%~dp0bin"
 set "ADB=%BIN%\adb.exe"
-if not exist "%ADB%" set "ADB=adb"
 set "SAVED=%~dp0config\phone.txt"
 set "SCRCPY_ICON_DIR=%BIN%"
 set "SCRCPY_SERVER_PATH=%BIN%\scrcpy-server"
 
+if exist "%ADB%" goto have_adb
+where adb >nul 2>&1
+if errorlevel 1 goto no_adb
+set "ADB=adb"
+:have_adb
+
+rem Skip the menu when the caller explicitly asks for the pairing code.
+if /i "%~1"=="--manual" goto manual
+
+echo ==========================================================
+echo  scrcpy wireless pairing
+echo ==========================================================
+echo   1. Scan a QR code on the phone        (recommended)
+echo   2. Type the 6-digit pairing code
+echo.
+set /p MODE=Press Enter to scan the QR code, or type M for the code: 
+if /i "%MODE%"=="M" goto manual
+if not exist "%~dp0scripts\pair-qr.ps1" goto manual
+
+echo.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\pair-qr.ps1"
+if not errorlevel 1 goto qr_done
+echo.
+echo QR pairing did not finish. Falling back to the 6-digit pairing code.
+echo.
+
+:manual
 echo On phone: Developer options - Wireless debugging - Pair device with pairing code
 echo Use the IP:port shown INSIDE the pairing dialog, NOT the main Wireless debugging screen.
 set /p PAIR=Pairing dialog IP:port: 
@@ -43,15 +69,28 @@ call :connect "%WIFI%"
 if not defined CONNECTED goto connect_fail
 
 :connected
->"%SAVED%" echo %WIFI%
+if not exist "%~dp0config" mkdir "%~dp0config" >nul 2>&1
+>"%SAVED%" echo(%WIFI%
 echo.
 echo Connected: %WIFI%
-echo Saved to phone.txt.
+echo Saved to config\phone.txt.
 echo.
 set /p START=Start mirroring now? [Y/N]: 
 if /i "%START%"=="Y" call "%~dp0mirror.bat"
 pause
 exit /b 0
+
+:qr_done
+echo.
+pause
+exit /b 0
+
+:no_adb
+echo.
+echo ERROR: adb.exe not found at "%ADB%" and not in PATH.
+echo Re-extract the package, or install Android platform-tools.
+pause
+exit /b 1
 
 :pair_fail
 echo.
