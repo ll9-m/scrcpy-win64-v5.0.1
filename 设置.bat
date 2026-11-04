@@ -66,6 +66,8 @@ if "%OPT_WINDOW%"=="2" set "T_WINDOW=全屏"
 if "%OPT_WINDOW%"=="3" set "T_WINDOW=无边框"
 set "T_KEEP=关"
 if "%OPT_KEEP_ACTIVE%"=="1" set "T_KEEP=开"
+set "T_APP=未设置"
+if not "%OPT_START_APP%"=="" set "T_APP=%OPT_START_APP%"
 
 echo ============================================================
 echo   scrcpy 投屏设置
@@ -81,6 +83,7 @@ echo   5. 帧率上限        %T_FPS%
 echo   6. 视频码率        %T_BITRATE%
 echo   7. 窗口形态        %T_WINDOW%
 echo   8. 保持亮屏        %T_KEEP%
+echo   9. 副屏启动应用    %T_APP%
 echo.
 echo   0. 保存并退出      Q. 不保存退出
 echo.
@@ -94,10 +97,21 @@ if "%CH%"=="5" goto cycle_fps
 if "%CH%"=="6" goto cycle_bitrate
 if "%CH%"=="7" goto cycle_window
 if "%CH%"=="8" goto toggle_keep
+if "%CH%"=="9" goto set_app
 if "%CH%"=="0" goto save
 if /i "%CH%"=="Q" goto quit
 if not defined CH goto no_input
 set "EMPTY=0"
+goto menu
+
+:set_app
+echo.
+echo 副屏是新建的一块空屏，上面没有任何界面，必须指定启动哪个应用才不会黑屏。
+echo 可以填包名（如 com.android.settings），也可以填关键字（如 ?bilibili），带 ? 会模糊匹配。
+echo 直接回车 = 不自动启动。
+set "APPIN="
+set /p APPIN=应用： 
+set "OPT_START_APP=%APPIN%"
 goto menu
 
 :toggle_screen
@@ -218,6 +232,7 @@ echo set "OPT_MAX_FPS=%OPT_MAX_FPS%"
 echo set "OPT_BITRATE=%OPT_BITRATE%"
 echo set "OPT_WINDOW=%OPT_WINDOW%"
 echo set "OPT_KEEP_ACTIVE=%OPT_KEEP_ACTIVE%"
+echo set "OPT_START_APP=%OPT_START_APP%"
 ) > "%SETFILE%"
 echo.
 echo 已保存：%SETFILE%
@@ -285,7 +300,7 @@ set "SER4=%~1"
 exit /b 0
 
 :identify
-rem 这里不能用 for /f 捕获 adb shell 的输出：带引号的 exe 路径再加 -s "地址"
+rem 这里不能用 for /f 捕获 adb 输出：带引号的 exe 路径再加 -s "地址"
 rem 会被 cmd 拆坏引号导致取不到值，改成先写临时文件再读。
 set "DEV_SERIAL="
 set "DEV_NAME="
@@ -311,4 +326,5 @@ set "OPT_MAX_FPS=60"
 set "OPT_BITRATE=8M"
 set "OPT_WINDOW=1"
 set "OPT_KEEP_ACTIVE=1"
+set "OPT_START_APP="
 exit /b 0
