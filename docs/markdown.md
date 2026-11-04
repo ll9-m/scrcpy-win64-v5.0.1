@@ -39,10 +39,11 @@ scrcpy-win64-v5.0.1/
 ├── .gitattributes              换行与二进制属性
 ├── .gitignore                  忽略运行时状态与产物
 ├── README.md                   快速上手
-├── 配对.bat                    ① 配对入口（输入地址 + 6 位码）
-├── 设置.bat                    ② 投屏设置（按手机序列号保存）
-├── 投屏.bat                    ③ 投屏入口
-├── 等待投屏.bat                ④ 等待式投屏入口
+├── 启动.bat                    ① 统一入口（菜单：配对/投屏/等待/设置）
+├── 配对.bat                    ② 配对入口（输入地址 + 6 位码）
+├── 设置.bat                    ③ 投屏设置（按手机序列号保存）
+├── 投屏.bat                    ④ 投屏入口
+├── 等待投屏.bat                ⑤ 等待式投屏入口
 ├── open_a_terminal_here.bat    官方：在此处打开命令行
 ├── scrcpy-noconsole.vbs        官方：无控制台窗口启动
 ├── bin/                        程序本体（13 个文件）
@@ -58,16 +59,24 @@ scrcpy-win64-v5.0.1/
 │   ├── swresample-7.dll
 │   ├── libusb-1.0.dll
 │   ├── scrcpy.png
+│   ├── scrcpy.ico              由 scrcpy.png 生成，供快捷方式使用
 │   └── disconnected.png
 ├── config/
 │   ├── phone.txt               上次连接成功的地址（不入库）
 │   └── phone.txt.example       格式示例
+├── tools/
+│   ├── 打包.bat                生成 dist\scrcpy-portable-*.zip
+│   ├── 创建快捷方式.bat        桌面「投屏」图标
+│   └── lib/
+│       ├── pack.ps1            白名单收集 + 压缩
+│       └── shortcut.ps1        PNG→ICO + 建 .lnk
+├── logs/                       按天记录运行日志（自动生成，不入库）
 └── docs/
     ├── markdown.md             本文档
     └── LICENSE.txt             Apache 2.0
 ```
 
-统计：根目录 9 个（6 个脚本 + README + 两个 git 配置），`bin/` 13 个，`config/` 1 个示例，`docs/` 2 个，合计 25 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
+统计：根目录 10 个（7 个脚本 + README + 两个 git 配置），`bin/` 14 个（含生成的 ico），`config/` 1 个示例，`docs/` 2 个，`tools/` 4 个，合计 29 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
 
 ---
 
@@ -75,7 +84,8 @@ scrcpy-win64-v5.0.1/
 
 | 层级 | 文件 | 职责 |
 |---|---|---|
-| **入口层** | `配对.bat`、`设置.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
+| **入口层** | `启动.bat`、`配对.bat`、`设置.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
+| **工具层** | `tools\打包.bat`、`tools\创建快捷方式.bat`、`tools\lib\*.ps1` | 发布与部署用，不参与日常投屏 |
 | **主程序层** | `bin/scrcpy.exe`、`bin/scrcpy-server` | 客户端主机程序 + 设备端代理 |
 | **通信层** | `bin/adb.exe`、`AdbWinApi.dll`、`AdbWinUsbApi.dll`、`libusb-1.0.dll` | 建立 PC ↔ 手机 通道 |
 | **媒体层** | `avcodec-63.dll`、`avformat-63.dll`、`avutil-61.dll`、`swresample-7.dll` | 解码 H.264/H.265、处理音频 |
@@ -87,6 +97,14 @@ scrcpy-win64-v5.0.1/
 ## 四、逐文件说明
 
 ### 4.1 入口脚本（根目录）
+
+#### `启动.bat` — 统一入口
+
+- **用途**：一个菜单把配对、投屏、等待投屏、设置串起来，也是桌面快捷方式的目标。
+- **动作**：`1` 配对、`2` 投屏、`3` 等待投屏、`4` 设置、`0` 退出。
+- **命令行直达**：`启动.bat pair` / `mirror` / `wait` / `settings`，跳过菜单。
+- **实现**：本身不做事，`call` 对应的脚本，所以每个功能的代码仍留在各自文件里，改一处不影响其它。
+  连续 5 次空输入会退出，避免输入流异常时空转。
 
 #### `配对.bat` — 配对入口
 
@@ -176,8 +194,33 @@ scrcpy-win64-v5.0.1/
 | `README.md` | 快速上手、常见问题 |
 | `docs/markdown.md` | 本文档 |
 | `docs/LICENSE.txt` | Apache 2.0 全文 |
-| `.gitignore` | 忽略 `phone.txt`、`logs/`、`*.log`、`*.zip`、`.workbuddy/` |
-| `.gitattributes` | `.bat`/`.vbs` 锁 CRLF；exe/dll/png/`scrcpy-server` 标为二进制 |
+| `.gitignore` | 忽略 `phone.txt`、`devices/`、`logs/`、`dist/`、`*.zip`、`.workbuddy/` |
+| `.gitattributes` | `.bat`/`.vbs`/`.ps1` 锁 CRLF；exe/dll/png/`scrcpy-server` 标为二进制 |
+
+### 4.5 工具（`tools/`）
+
+| 文件 | 说明 |
+|---|---|
+| `打包.bat` → `lib/pack.ps1` | 白名单收集文件后压成 `dist\scrcpy-portable-<版本>-<日期>.zip`（约 11 MB） |
+| `创建快捷方式.bat` → `lib/shortcut.ps1` | 生成 `bin\scrcpy.ico`，并在桌面建指向 `启动.bat` 的快捷方式 |
+
+两个关键实现细节：
+
+- **为什么用白名单而不是黑名单**：打包是"不复制即排除"，所以 `.git`、`.workbuddy`、`logs`、
+  `dist`、`config\phone.txt`、`config\devices\` 天生不会进包，不会因为新增目录而漏掉。
+- **为什么 PNG 不能直接当图标**：快捷方式的 `IconLocation` 只认 `.ico`（或 exe/dll 里的资源）。
+  `shortcut.ps1` 直接把 256×256 的 PNG 字节包进 ICO 容器（22 字节头 + 原 PNG，Vista 起支持），
+  不依赖 `System.Drawing`。
+
+### 4.6 日志（`logs/`）
+
+按天一个文件（`2026-11-05.log`），由 `投屏.bat` 和 `配对.bat` 写入，只保留最近 40 个。
+
+- **格式**：`[时:分:秒] 消息`，日期由文件名体现
+- **记什么**：设备发现结果、选中的设备、每次 `adb connect` / `adb pair` 的**原始输出**、
+  最终 scrcpy 命令行、退出码
+- **实现**：`投屏.bat` / `配对.bat` 内置 `:init_log` 与 `:log` 两个子程序；
+  时间用 `%time%`，日期只在启动时算一次——**不要每行都调 PowerShell 取时间**，那会让脚本明显变慢
 
 ---
 
@@ -236,6 +279,8 @@ scrcpy-win64-v5.0.1/
 | `refactor: rename the entry scripts to Chinese` | 三个入口改中文名，控制台输出全部中文化 |
 | `refactor: drop QR pairing` | **删除扫码链路**：校园网 / 公共 Wi-Fi 过滤 mDNS 组播，扫码必然失败；退回纯配对码方式 |
 | `feat: per-device mirror settings` | 新增 `设置.bat`，关屏 / 副屏 / 剪贴板 / 画质 / 窗口 / 保活可配，按序列号存 `config\devices\`；`投屏.bat` 读设置组装参数，并支持多设备选择 |
+| `fix: virtual display shows black` | 副屏默认空屏，补 `--start-app` 配置项（设置第 9 项） |
+| `feat: unified launcher, logs and tools` | 新增 `启动.bat` 统一入口；`投屏/配对` 写入 `logs/`；`tools\` 提供打包与桌面快捷方式 |
 
 ---
 
@@ -243,7 +288,5 @@ scrcpy-win64-v5.0.1/
 
 | 优先级 | 内容 |
 |---|---|
-| 高 | 关键步骤写 `logs/`，失败时保留 adb 原始输出 |
 | 中 | 插一次 USB 后 `adb tcpip 5555`，把无线端口固定下来，省掉每次查端口 |
-| 中 | `config/devices.txt` 支持多设备（别名 + 地址） |
-| 中 | 一键生成干净 zip；生成带图标的桌面快捷方式 |
+| 中 | `config/devices.txt` 支持多设备（别名 + 地址），而不是只能靠序列号

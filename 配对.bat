@@ -14,6 +14,9 @@ if errorlevel 1 goto no_adb
 set "ADB=adb"
 :have_adb
 
+call :init_log
+call :log "==== 配对开始 ===="
+
 echo ============================================================
 echo   scrcpy 无线配对
 echo ============================================================
@@ -24,14 +27,22 @@ set /p PAIR=配对弹窗 IP:端口：
 set /p CODE=6 位配对码： 
 if not defined PAIR goto pair_fail
 if not defined CODE goto pair_fail
-"%ADB%" pair %PAIR% %CODE%
-if errorlevel 1 goto pair_fail
+
+set "TMPP=%TEMP%\scrcpy_pair.txt"
+"%ADB%" pair %PAIR% %CODE% > "%TMPP%" 2>&1
+set "RC=%errorlevel%"
+type "%TMPP%"
+set "POUT="
+if exist "%TMPP%" set /p POUT=<"%TMPP%"
+del "%TMPP%" >nul 2>&1
+call :log "adb pair %PAIR% rc=%RC% -> %POUT%"
+if not "%RC%"=="0" goto pair_fail
 
 echo.
 echo 配对成功，正在查找投屏用的连接端口...
 ping -n 3 127.0.0.1 >nul
 set "WIFI="
-for /f "tokens=2,3" %%a in ('"%ADB%" mdns services 2^>nul') do if /i "%%a"=="_adb-tls-connect._tcp" (
+for /f "tokens=2,3" %%a in ('"%ADB%" mdns services 2^>nul ^<nul') do if /i "%%a"=="_adb-tls-connect._tcp" (
   if not defined WIFI set "WIFI=%%b"
 )
 
@@ -56,6 +67,7 @@ if not defined CONNECTED goto connect_fail
 :connected
 if not exist "%~dp0config" mkdir "%~dp0config" >nul 2>&1
 >"%SAVED%" echo(%WIFI%
+call :log "配对完成，保存地址 %WIFI%"
 echo.
 echo 已连接：%WIFI%
 echo 地址已保存到 config\phone.txt
@@ -66,6 +78,7 @@ pause
 exit /b 0
 
 :no_adb
+call :log "找不到 adb.exe"
 echo.
 echo 错误：找不到 adb.exe
 echo   期望位置：%ADB%
@@ -74,6 +87,7 @@ pause
 exit /b 1
 
 :pair_fail
+call :log "配对失败：%PAIR%"
 echo.
 echo 配对失败。请检查 6 位码，并保持配对弹窗不要关闭。
 echo 如果提示 protocol fault，说明填成了主界面的端口。
@@ -82,6 +96,7 @@ pause
 exit /b 1
 
 :connect_fail
+call :log "连接失败：%WIFI%"
 echo.
 echo 连接 %WIFI% 失败。
 echo 1. 要填「无线调试」主界面上的 IP 和端口，不是配对端口
@@ -94,8 +109,13 @@ exit /b 1
 :connect
 if "%~1"=="" exit /b 0
 set "CONNECTED="
-"%ADB%" connect "%~1"
-for /f "skip=1 tokens=1,2" %%x in ('"%ADB%" devices 2^>nul') do (
+set "TMPC=%TEMP%\scrcpy_connect.txt"
+"%ADB%" connect "%~1" > "%TMPC%" 2>&1
+set "CROUT="
+if exist "%TMPC%" set /p CROUT=<"%TMPC%"
+del "%TMPC%" >nul 2>&1
+call :log "adb connect %~1 -> %CROUT%"
+for /f "skip=1 tokens=1,2" %%x in ('"%ADB%" devices 2^>nul ^<nul') do (
   if /i "%%x"=="%~1" if /i "%%y"=="device" set "CONNECTED=1"
 )
 if defined CONNECTED (
@@ -104,4 +124,21 @@ if defined CONNECTED (
   echo 还没连上。
   "%ADB%" devices
 )
+exit /b 0
+
+:init_log
+rem 按天一个日志文件，只保留最近 40 个，避免无限增长
+set "LOGDIR=%~dp0logs"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>&1
+set "TODAY=%date:~0,10%"
+set "TODAY=%TODAY:/=-%"
+set "TODAY=%TODAY:.=-%"
+set "TODAY=%TODAY: =-%"
+set "LOG=%LOGDIR%\%TODAY%.log"
+for /f "skip=40 delims=" %%f in ('dir /b /o-d "%LOGDIR%\*.log" 2^>nul') do del "%LOGDIR%\%%f" >nul 2>&1
+exit /b 0
+
+:log
+if not defined LOG exit /b 0
+>>"%LOG%" echo([%time%] %~1
 exit /b 0

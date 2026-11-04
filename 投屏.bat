@@ -16,6 +16,8 @@ if /i "%~1"=="--wait" set "WAIT=1"
 
 call :check_bin
 if errorlevel 1 exit /b 1
+call :init_log
+call :log "==== 投屏开始，参数=[%~1] ===="
 
 :discover
 set "SERIAL="
@@ -37,6 +39,10 @@ for /f "skip=1 tokens=1,2" %%a in ('"%ADB%" devices 2^>nul ^<nul') do (
   if /i "%%b"=="offline" set "OFFLINE=1"
 )
 
+if defined SER1 call :log "在线设备：%SER1% %SER2% %SER3% %SER4%"
+if defined UNAUTH call :log "adb 报告有设备未授权"
+if defined OFFLINE call :log "adb 报告有设备离线"
+
 if not defined SER1 goto try_saved
 if not defined SER2 (
   set "SERIAL=%SER1%"
@@ -57,10 +63,12 @@ if exist "%SAVED%" for /f "usebackq delims=" %%t in ("%SAVED%") do (
     echo %%t | findstr /r /c:"^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*:[0-9][0-9]*$" >nul && set "TARGET=%%t"
   )
 )
+if defined TARGET call :log "尝试 phone.txt 里的地址 %TARGET%"
 if defined TARGET call :connect "%TARGET%"
 if defined CONNECTED goto run
 
-for /f "tokens=2,3" %%a in ('"%ADB%" mdns services 2^>nul') do if "%%a"=="_adb-tls-connect._tcp" (
+for /f "tokens=2,3" %%a in ('"%ADB%" mdns services 2^>nul ^<nul') do if "%%a"=="_adb-tls-connect._tcp" (
+  call :log "尝试 mDNS 广播 %%b"
   call :connect "%%b"
   if defined CONNECTED goto run
 )
@@ -79,6 +87,7 @@ if defined WAIT (
   goto discover
 )
 
+call :log "没有找到手机，退出"
 echo 没有找到手机，请检查：
 echo 1. 手机和电脑在同一个 Wi-Fi
 echo 2. 手机的「无线调试」已经打开
@@ -125,7 +134,12 @@ exit /b 0
 
 :connect
 if "%~1"=="" exit /b 0
-"%ADB%" connect "%~1" >nul 2>&1
+set "TMPC=%TEMP%\scrcpy_connect.txt"
+"%ADB%" connect "%~1" > "%TMPC%" 2>&1
+set "CROUT="
+if exist "%TMPC%" set /p CROUT=<"%TMPC%"
+del "%TMPC%" >nul 2>&1
+call :log "adb connect %~1 -> %CROUT%"
 for /f "skip=1 tokens=1,2" %%x in ('"%ADB%" devices 2^>nul ^<nul') do (
   if /i "%%x"=="%~1" if /i "%%y"=="device" (
     set "SERIAL=%%x"
@@ -163,7 +177,12 @@ set "OPT_WINDOW=1"
 set "OPT_START_APP="
 set "OPT_KEEP_ACTIVE=1"
 set "SETFILE=%DEVDIR%\%DEV_SERIAL%.bat"
-if exist "%SETFILE%" call "%SETFILE%"
+if exist "%SETFILE%" (
+  call :log "读取设置 %DEV_SERIAL%.bat"
+  call "%SETFILE%"
+) else (
+  call :log "没有 %DEV_SERIAL%.bat，使用默认设置"
+)
 
 set "ARGS="
 if "%OPT_SCREEN_OFF%"=="1" set "ARGS=%ARGS% --turn-screen-off"
@@ -177,6 +196,23 @@ if not "%OPT_START_APP%"=="" set "ARGS=%ARGS% --start-app=%OPT_START_APP%"
 if "%OPT_WINDOW%"=="1" set "ARGS=%ARGS% --always-on-top"
 if "%OPT_WINDOW%"=="2" set "ARGS=%ARGS% --fullscreen"
 if "%OPT_WINDOW%"=="3" set "ARGS=%ARGS% --window-borderless"
+exit /b 0
+
+:init_log
+rem 按天一个日志文件，只保留最近 40 个，避免无限增长
+set "LOGDIR=%~dp0logs"
+if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>&1
+set "TODAY=%date:~0,10%"
+set "TODAY=%TODAY:/=-%"
+set "TODAY=%TODAY:.=-%"
+set "TODAY=%TODAY: =-%"
+set "LOG=%LOGDIR%\%TODAY%.log"
+for /f "skip=40 delims=" %%f in ('dir /b /o-d "%LOGDIR%\*.log" 2^>nul') do del "%LOGDIR%\%%f" >nul 2>&1
+exit /b 0
+
+:log
+if not defined LOG exit /b 0
+>>"%LOG%" echo([%time%] %~1
 exit /b 0
 
 :check_bin
@@ -202,9 +238,12 @@ exit /b 0
 
 :run
 call :apply_settings
+call :log "使用设备 %SERIAL%，执行参数：%ARGS%"
 if defined SERIAL (
   "%SCRCPY%" -s "%SERIAL%"%ARGS%
 ) else (
   "%SCRCPY%"%ARGS%
 )
-exit /b 0
+set "RC=%errorlevel%"
+call :log "scrcpy 退出码 %RC%"
+exit /b %RC%

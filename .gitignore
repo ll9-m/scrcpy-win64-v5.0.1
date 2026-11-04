@@ -5,12 +5,16 @@ config/phone.txt
 # 每台手机的投屏设置，属于本机状态
 config/devices/
 
+# 由 scrcpy.png 生成的快捷方式图标
+bin/scrcpy.ico
+
 # 日志
 logs/
 *.log
 
 # 打包产物
 *.zip
+dist/
 
 # Agent 工作目录
 .workbuddy/
