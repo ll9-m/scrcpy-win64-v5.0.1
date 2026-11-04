@@ -35,7 +35,12 @@ function Step { param([string]$m) Write-Host "[*] $m" -ForegroundColor Cyan }
 function Ok   { param([string]$m) Write-Host "[+] $m" -ForegroundColor Green }
 function Warn { param([string]$m) Write-Host "[!] $m" -ForegroundColor Yellow }
 function Fail { param([string]$m) Write-Host "[x] $m" -ForegroundColor Red }
-function Say  { param([string]$m) Write-Host $m }
+function Say  {
+    param([string]$m)
+    # Write-Host "" does not always emit a line break depending on the host,
+    # so print a space for intentionally blank lines.
+    if ([string]::IsNullOrEmpty($m)) { Write-Host ' ' } else { Write-Host $m }
+}
 
 function Invoke-Adb {
     param([string[]]$Arguments)
@@ -101,6 +106,20 @@ if ($mdns -notmatch 'mdns daemon version') {
     Say  '  常见原因：VPN 或虚拟网卡占用、防火墙拦截 UDP 5353、adb 版本过旧。'
     Say  '  可以先关闭 VPN 再试，或直接改用手输 6 位配对码。'
     exit 3
+}
+
+# The single most common failure is "phone and PC are not actually on the same
+# network", so print the local addresses before anything else.
+$locals = @()
+try {
+    $locals = @(Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+        Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' } |
+        ForEach-Object { "$($_.IPAddress)/$($_.PrefixLength)" })
+} catch { }
+if ($locals.Count -gt 0) {
+    Say "本机地址：$($locals -join '  ')"
+    Say '  手机要和上面某个地址处于同一网段，扫码才可能成功。'
+    Say ''
 }
 
 $existing = @(Get-NetworkDevices)
@@ -209,10 +228,16 @@ Say ''
 
 $tried = @{}
 $paired = $null
-$deadline = (Get-Date).AddSeconds($PairTimeoutSec)
+$started = Get-Date
+$deadline = $started.AddSeconds($PairTimeoutSec)
+$servicesSeen = 0
+$isolatedHinted = $false
+$nextReport = $started.AddSeconds(15)
 
 while (-not $paired -and (Get-Date) -lt $deadline) {
-    $pending = @(@(Get-AdbServices) | Where-Object { $_.Kind -eq 'pairing' -and -not $tried.ContainsKey($_.Address) })
+    $all = @(Get-AdbServices)
+    $servicesSeen += $all.Count
+    $pending = @($all | Where-Object { $_.Kind -eq 'pairing' -and -not $tried.ContainsKey($_.Address) })
 
     # Prefer the instance we asked the phone to advertise, then anything new.
     $ordered = @()
@@ -234,16 +259,53 @@ while (-not $paired -and (Get-Date) -lt $deadline) {
         Warn "该地址配对失败：$first"
     }
 
-    if (-not $paired) { Start-Sleep -Milliseconds 1200 }
+    if ($paired) { break }
+
+    $elapsed = [int]((Get-Date) - $started).TotalSeconds
+
+   # Nothing at all showed up: far more likely a network problem than a QR problem.
+    if (-not $isolatedHinted -and $elapsed -ge 20 -and $servicesSeen -eq 0) {
+        Say ''
+        Warn '20 秒内没有发现任何 mDNS 广播。'
+        Say  '  手机的配对广播到不了本机，常见原因：'
+        Say  '    - 校园网 / 企业网 / 公共 Wi-Fi 开启了客户端隔离（最常见）'
+        Say  '    - 手机和电脑不在同一网段，对比上面打印的本机地址'
+        Say  '    - Windows 把该网络识别为"公用"，防火墙拦掉了入站'
+        Say  '  可以先改用手机热点，或直接插 USB 线投屏（无需配对）。'
+        Say  '  脚本仍会继续等待；按 Ctrl+C 可以退出后改用手输配对码。'
+        Say ''
+        $isolatedHinted = $true
+    }
+
+    if ((Get-Date) -ge $nextReport) {
+        Say "    ... 已等待 $elapsed 秒，累计发现 $servicesSeen 个 mDNS 服务"
+        $nextReport = (Get-Date).AddSeconds(15)
+    }
+
+    # If multicast is being dropped, no amount of extra waiting will help.
+    if ($servicesSeen -eq 0 -and $elapsed -ge 45) {
+        Say ''
+        Warn '45 秒内始终没有任何广播，继续等待也不会有结果，先退出。'
+        break
+    }
+
+    Start-Sleep -Milliseconds 1200
 }
 
 if (-not $paired) {
     Say ''
-    Fail '等待超时，没有完成配对。'
-    Say '  1. 手机上的"使用二维码配对设备"页面必须保持打开，关掉后二维码即失效'
-    Say '  2. 手机与电脑要在同一个 Wi-Fi，且路由器没有开启客户端隔离（AP isolation）'
-    Say '  3. 关闭 VPN、虚拟网卡后重试；企业/公共 Wi-Fi 常常拦截 mDNS'
-    Say '  4. 也可以退回手输 6 位配对码的方式'
+    Fail '配对没有完成。'
+    if ($servicesSeen -eq 0) {
+        Say '  全程没有发现任何 mDNS 广播 —— 这是网络问题，不是二维码问题。'
+        Say '  1. 校园网 / 公共 Wi-Fi 常开客户端隔离，设备之间互相看不见'
+        Say '  2. 让电脑连手机热点（或手机连电脑热点），通常立刻就能用'
+        Say '  3. 也可以直接插 USB 线，运行 mirror.bat 即可投屏，完全不需要配对'
+    } else {
+        Say '  发现过广播但没配对成功，多半是配对码或时序问题。'
+        Say '  1. 手机上的二维码页面必须一直开着，关掉即失效'
+        Say '  2. 重新运行本脚本，生成新的二维码再扫一次'
+        Say '  3. 或改用手输 6 位配对码'
+    }
     exit 2
 }
 

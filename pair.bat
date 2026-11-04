@@ -19,11 +19,12 @@ if /i "%~1"=="--manual" goto manual
 echo ==========================================================
 echo  scrcpy wireless pairing
 echo ==========================================================
-echo   1. Scan a QR code on the phone        (recommended)
-echo   2. Type the 6-digit pairing code
+echo   1. Scan a QR code on the phone        (needs working mDNS)
+echo   2. Type the 6-digit pairing code       (works without mDNS)
 echo.
-set /p MODE=Press Enter to scan the QR code, or type M for the code: 
+set /p MODE=Press Enter for 1, or type 2: 
 if /i "%MODE%"=="M" goto manual
+if "%MODE%"=="2" goto manual
 if not exist "%~dp0scripts\pair-qr.ps1" goto manual
 
 echo.
@@ -58,6 +59,7 @@ if defined WIFI (
   echo Automatic connection failed.
 ) else (
   echo Could not find the connection port automatically.
+  echo This is expected on networks that block mDNS ^(campus / public Wi-Fi^).
 )
 
 echo On the main Wireless debugging screen, find "IP address and port".
