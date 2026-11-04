@@ -2,6 +2,9 @@
 phone.txt
 config/phone.txt
 
+# 每台手机的投屏设置，属于本机状态
+config/devices/
+
 # 日志
 logs/
 *.log

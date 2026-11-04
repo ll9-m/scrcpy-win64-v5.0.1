@@ -40,8 +40,9 @@ scrcpy-win64-v5.0.1/
 ├── .gitignore                  忽略运行时状态与产物
 ├── README.md                   快速上手
 ├── 配对.bat                    ① 配对入口（输入地址 + 6 位码）
-├── 投屏.bat                    ② 投屏入口
-├── 等待投屏.bat                ③ 等待式投屏入口
+├── 设置.bat                    ② 投屏设置（按手机序列号保存）
+├── 投屏.bat                    ③ 投屏入口
+├── 等待投屏.bat                ④ 等待式投屏入口
 ├── open_a_terminal_here.bat    官方：在此处打开命令行
 ├── scrcpy-noconsole.vbs        官方：无控制台窗口启动
 ├── bin/                        程序本体（13 个文件）
@@ -66,7 +67,7 @@ scrcpy-win64-v5.0.1/
     └── LICENSE.txt             Apache 2.0
 ```
 
-统计：根目录 8 个（5 个脚本 + README + 两个 git 配置），`bin/` 13 个，`config/` 1 个示例，`docs/` 2 个，合计 24 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
+统计：根目录 9 个（6 个脚本 + README + 两个 git 配置），`bin/` 13 个，`config/` 1 个示例，`docs/` 2 个，合计 25 个受版本控制的文件，约 25.6 MB（其中 24.9 MB 是二进制）。
 
 ---
 
@@ -74,7 +75,7 @@ scrcpy-win64-v5.0.1/
 
 | 层级 | 文件 | 职责 |
 |---|---|---|
-| **入口层** | `配对.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
+| **入口层** | `配对.bat`、`设置.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
 | **主程序层** | `bin/scrcpy.exe`、`bin/scrcpy-server` | 客户端主机程序 + 设备端代理 |
 | **通信层** | `bin/adb.exe`、`AdbWinApi.dll`、`AdbWinUsbApi.dll`、`libusb-1.0.dll` | 建立 PC ↔ 手机 通道 |
 | **媒体层** | `avcodec-63.dll`、`avformat-63.dll`、`avutil-61.dll`、`swresample-7.dll` | 解码 H.264/H.265、处理音频 |
@@ -99,15 +100,25 @@ scrcpy-win64-v5.0.1/
 - **项目角色**：**`phone.txt` 的写入方之一**（另一处是 `投屏.bat` 的连接回调）。
 - **为什么没有扫码**：扫码配对依赖手机通过 mDNS 组播公布配对端口，而校园网 / 公共 Wi-Fi 普遍过滤组播，手机端会一直转圈等不到连接。配对码走点对点 TCP，不受影响，因此只保留这条路径。
 
+#### `设置.bat` — 投屏设置
+
+- **用途**：交互式菜单，逐项开关投屏行为，按 `0` 保存。
+- **设备识别**：以 `ro.serialno` 作为配置文件名（这台机器上是 `b385b2bb`），所以换 Wi-Fi、换 IP 后设置仍然属于同一台手机；多台在线时先让你选。
+- **可配项**：关屏投屏、虚拟副屏、剪贴板同步、分辨率上限、帧率上限、视频码率、窗口形态、保持亮屏。
+- **保存位置**：`config\devices\<序列号>.bat`，内容是若干 `set "OPT_*=..."`，可以直接手改（保持 GBK 编码）。
+- **两个踩过的坑**（改这段代码前务必知道）：
+  1. 取设备信息必须用 `exec-out getprop`，不能用 `shell getprop`——`adb shell` 会分配终端并抢走控制台输入缓冲，导致之后的 `set /p` 读不到按键；
+  2. 不能用 `for /f` 去捕获这个输出——带引号的 exe 路径再加 `-s "地址"` 会被 cmd 拆坏引号，取回空值。改成先重定向到临时文件，再 `set /p` 读。
+
 #### `投屏.bat` — 投屏入口
 
 - **用途**：日常一键投屏。
-- **设备发现顺序**（四级回退）：
-  1. `adb devices` 中带 `:` 的网络设备（跳过 `emulator-*`）；
-  2. 普通 USB 设备；
-  3. `config\phone.txt` 里保存的地址（**校验必须是 `IPv4:端口`**，防止 BOM / 空行污染）；
-  4. `adb mdns services` 中的 `_adb-tls-connect._tcp`。
-- **启动参数**：`--max-size=1280 --max-fps=60 --keep-active --always-on-top`（目前硬编码）。
+- **设备发现顺序**：
+  1. `adb devices` 中所有在线设备（跳过 `emulator-*`，并过滤掉同一台手机的 mDNS 实例名 `*._adb-tls-connect._tcp`，否则同一台会被算成两台）；
+  2. 多于一台时弹菜单让你选，`--wait` 模式下直接取第一台不打断流程；
+  3. 没有设备则试 `config\phone.txt` 里的地址（**校验必须是 `IPv4:端口`**，防止 BOM / 空行污染）；
+  4. 再试 `adb mdns services` 中的 `_adb-tls-connect._tcp`。
+- **启动参数**：不再硬编码，来自 `config\devices\<序列号>.bat`；该文件不存在时用默认值（1280 / 60fps / 8M / 置顶 / 保持亮屏）。
 - **`--wait`**：进入轮询模式，每约 15 秒重试一次，供 `等待投屏.bat` 使用。
 - **项目角色**：**主流程编排器**，整个项目的控制流都在这里。
 
@@ -151,8 +162,11 @@ scrcpy-win64-v5.0.1/
 |---|---|
 | `phone.txt` | 单行 `IP:端口`，每次连接成功后被重写；已加入 `.gitignore` |
 | `phone.txt.example` | 格式示例，供参考 |
+| `devices\<序列号>.bat` | **每台手机一份投屏设置**，由 `设置.bat` 生成，`投屏.bat` 读取 |
 
-读取方（`投屏.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
+`phone.txt` 只是"上次连得上的地址"，会随 IP 变化；`devices\` 下的设置以 `ro.serialno` 命名，**换网络、换 IP 都还是同一份**，多台手机各存各的，不会互相覆盖。
+
+读取方（`投屏.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验 `phone.txt`，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
 
 ### 4.4 文档与配置
 
@@ -172,13 +186,15 @@ scrcpy-win64-v5.0.1/
 
 ```
 投屏.bat
-  └─ adb devices ──► 网络设备 / USB 设备
-       ├─ 无 → config\phone.txt（校验后 adb connect）
-       └─ 无 → adb mdns services → _adb-tls-connect._tcp
-            └─ scrcpy.exe -s <serial> --max-size=1280 ...
-                 ├─ 推送 scrcpy-server 到手机并启动
-                 ├─ FFmpeg 解码 ◄── 手机 MediaCodec 编码
-                 └─ SDL3 渲染 + 反向注入键鼠
+  ├─ adb devices ──► 在线设备（去重、跳过模拟器）
+  │    └─ 多台 → 选择一台
+  ├─ 无 → config\phone.txt（校验后 adb connect）
+  ├─ 无 → adb mdns services → _adb-tls-connect._tcp
+  └─ 取 ro.serialno → 读 config\devices\<序列号>.bat
+       └─ scrcpy.exe -s <serial> <按设置拼出的参数>
+            ├─ 推送 scrcpy-server 到手机并启动
+            ├─ FFmpeg 解码 ◄── 手机 MediaCodec 编码
+            └─ SDL3 渲染 + 反向注入键鼠
 ```
 
 ### 配对
@@ -218,6 +234,7 @@ scrcpy-win64-v5.0.1/
 | `fix: make the pairing menu explicit ...` | 菜单接受 `2`；mDNS 被拦时 20 秒告警、45 秒提前退出 |
 | `refactor: rename the entry scripts to Chinese` | 三个入口改中文名，控制台输出全部中文化 |
 | `refactor: drop QR pairing` | **删除扫码链路**：校园网 / 公共 Wi-Fi 过滤 mDNS 组播，扫码必然失败；退回纯配对码方式 |
+| `feat: per-device mirror settings` | 新增 `设置.bat`，关屏 / 副屏 / 剪贴板 / 画质 / 窗口 / 保活可配，按序列号存 `config\devices\`；`投屏.bat` 读设置组装参数，并支持多设备选择 |
 
 ---
 
@@ -225,7 +242,6 @@ scrcpy-win64-v5.0.1/
 
 | 优先级 | 内容 |
 |---|---|
-| 高 | 投屏参数外置到 `config/settings.bat`（分辨率、帧率、码率、录制、音频） |
 | 高 | 关键步骤写 `logs/`，失败时保留 adb 原始输出 |
 | 中 | 插一次 USB 后 `adb tcpip 5555`，把无线端口固定下来，省掉每次查端口 |
 | 中 | `config/devices.txt` 支持多设备（别名 + 地址） |
