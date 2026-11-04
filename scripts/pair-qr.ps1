@@ -29,7 +29,7 @@ $Adb       = Join-Path $Root 'bin\adb.exe'
 $ConfigDir = Join-Path $Root 'config'
 $PhoneFile = Join-Path $ConfigDir 'phone.txt'
 $QrLib     = Join-Path $ScriptDir 'lib\qr.js'
-$MirrorBat = Join-Path $Root 'mirror.bat'
+$MirrorBat = Join-Path $Root '投屏.bat'
 
 function Step { param([string]$m) Write-Host "[*] $m" -ForegroundColor Cyan }
 function Ok   { param([string]$m) Write-Host "[+] $m" -ForegroundColor Green }
@@ -125,7 +125,7 @@ if ($locals.Count -gt 0) {
 $existing = @(Get-NetworkDevices)
 if ($existing.Count -gt 0) {
     Ok "已经连接：$($existing[0])"
-    Say '无需重新配对，直接运行 mirror.bat 即可。'
+    Say '无需重新配对，直接运行「投屏.bat」即可。'
     Say '（若要配对新手机，先在手机或电脑上断开当前连接。）'
     exit 0
 }
@@ -299,7 +299,7 @@ if (-not $paired) {
         Say '  全程没有发现任何 mDNS 广播 —— 这是网络问题，不是二维码问题。'
         Say '  1. 校园网 / 公共 Wi-Fi 常开客户端隔离，设备之间互相看不见'
         Say '  2. 让电脑连手机热点（或手机连电脑热点），通常立刻就能用'
-        Say '  3. 也可以直接插 USB 线，运行 mirror.bat 即可投屏，完全不需要配对'
+        Say '  3. 也可以直接插 USB 线，运行「投屏.bat」即可投屏，完全不需要配对'
     } else {
         Say '  发现过广播但没配对成功，多半是配对码或时序问题。'
         Say '  1. 手机上的二维码页面必须一直开着，关掉即失效'
@@ -347,7 +347,7 @@ if (-not $target) {
 if (-not $target) {
     Say ''
     Fail '配对成功，但没能建立数据连接。'
-    Say '  打开手机的"无线调试"主界面，把上面显示的 IP:port 用 pair.bat 的手输流程连一次。'
+    Say '  打开手机的"无线调试"主界面，把上面显示的 IP:port 用「配对.bat」的手输流程连一次。'
     exit 2
 }
 

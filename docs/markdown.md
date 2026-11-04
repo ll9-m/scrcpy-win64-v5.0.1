@@ -39,9 +39,9 @@ scrcpy-win64-v5.0.1/
 ├── .gitattributes              换行与二进制属性
 ├── .gitignore                  忽略运行时状态与产物
 ├── README.md                   快速上手
-├── pair.bat                    ① 配对入口（扫码 / 手输）
-├── mirror.bat                  ② 投屏入口
-├── mirror-wait.bat             ③ 等待式投屏入口
+├── 配对.bat                    ① 配对入口（扫码 / 手输）
+├── 投屏.bat                    ② 投屏入口
+├── 等待投屏.bat                ③ 等待式投屏入口
 ├── open_a_terminal_here.bat    官方：在此处打开命令行
 ├── scrcpy-noconsole.vbs        官方：无控制台窗口启动
 ├── bin/                        程序本体（13 个文件）
@@ -80,7 +80,7 @@ scrcpy-win64-v5.0.1/
 
 | 层级 | 文件 | 职责 |
 |---|---|---|
-| **入口层** | `pair.bat`、`mirror.bat`、`mirror-wait.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
+| **入口层** | `配对.bat`、`投屏.bat`、`等待投屏.bat`、`open_a_terminal_here.bat`、`scrcpy-noconsole.vbs` | 用户双击的对象，负责参数与流程编排 |
 | **编排层** | `scripts/pair-qr.ps1` | 扫码配对的完整状态机 |
 | **算法层** | `scripts/lib/qr.js` | 二维码编码 |
 | **主程序层** | `bin/scrcpy.exe`、`bin/scrcpy-server` | 客户端主机程序 + 设备端代理 |
@@ -95,7 +95,7 @@ scrcpy-win64-v5.0.1/
 
 ### 4.1 入口脚本（根目录）
 
-#### `pair.bat` — 配对入口
+#### `配对.bat` — 配对入口
 
 - **用途**：一次性的设备配对引导，扫码为主、手输为辅。
 - **流程**：
@@ -104,9 +104,9 @@ scrcpy-win64-v5.0.1/
   3. 扫码返回非 0（超时 / mDNS 不可用）时自动降级到 6 位码流程，不会让人卡死；
   4. 手输流程：`adb pair <IP:端口> <6位码>` → 等 3 秒 → 用 mDNS 嗅探真实连接端口 → `adb connect`；
   5. 成功后写入 `config\phone.txt`，并询问是否立刻投屏。
-- **项目角色**：**`phone.txt` 的写入方之一**（另一处是 `mirror.bat` 的连接回调）。
+- **项目角色**：**`phone.txt` 的写入方之一**（另一处是 `投屏.bat` 的连接回调）。
 
-#### `mirror.bat` — 投屏入口
+#### `投屏.bat` — 投屏入口
 
 - **用途**：日常一键投屏。
 - **设备发现顺序**（四级回退）：
@@ -115,12 +115,12 @@ scrcpy-win64-v5.0.1/
   3. `config\phone.txt` 里保存的地址（**校验必须是 `IPv4:端口`**，防止 BOM / 空行污染）；
   4. `adb mdns services` 中的 `_adb-tls-connect._tcp`。
 - **启动参数**：`--max-size=1280 --max-fps=60 --keep-active --always-on-top`（目前硬编码）。
-- **`--wait`**：进入轮询模式，每约 15 秒重试一次，供 `mirror-wait.bat` 使用。
+- **`--wait`**：进入轮询模式，每约 15 秒重试一次，供 `等待投屏.bat` 使用。
 - **项目角色**：**主流程编排器**，整个项目的控制流都在这里。
 
-#### `mirror-wait.bat` — 等待式启动
+#### `等待投屏.bat` — 等待式启动
 
-- **内容**：新开窗口执行 `mirror.bat --wait`。
+- **内容**：新开窗口执行 `投屏.bat --wait`。
 - **用途**：适合"先开脚本，再去手机开无线调试"的习惯。
 
 #### `open_a_terminal_here.bat` — 开终端（官方）
@@ -159,7 +159,7 @@ scrcpy-win64-v5.0.1/
 | `phone.txt` | 单行 `IP:端口`，每次连接成功后被重写；已加入 `.gitignore` |
 | `phone.txt.example` | 格式示例，供参考 |
 
-读取方（`mirror.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
+读取方（`投屏.bat`）会用正则 `^[0-9.]+\.[0-9]+:[0-9]+$` 校验，不合法就当作不存在，继续走 mDNS —— 所以手工编辑坏了也不会导致连接失败，只是失去这项加速。
 
 ### 4.4 脚本（`scripts/`）
 
@@ -207,7 +207,7 @@ scrcpy-win64-v5.0.1/
 ### 投屏
 
 ```
-mirror.bat
+投屏.bat
   └─ adb devices ──► 网络设备 / USB 设备
        ├─ 无 → config\phone.txt（校验后 adb connect）
        └─ 无 → adb mdns services → _adb-tls-connect._tcp
@@ -220,7 +220,7 @@ mirror.bat
 ### 扫码配对
 
 ```
-pair.bat ──► pair-qr.ps1
+配对.bat ──► pair-qr.ps1
                ├─ adb mdns check（不可用则直接退出）
                ├─ 生成 WIFI:T:ADB;S:<名>;P:<码>;; → HTML → 浏览器
                ├─ 手机扫码 → 广播 _adb-tls-pairing._tcp
@@ -240,7 +240,7 @@ pair.bat ──► pair-qr.ps1
 
 另外两条工程约定：
 
-- **`.bat` 内只用 ASCII**。cmd 按 OEM 代码页逐字节读脚本，写入 UTF-8 中文会乱码，`chcp 65001` 又会破坏后续解析。中文提示只放在 `.ps1` 里。
+- **`.bat` 必须存成 GBK（代码页 936）并用 CRLF 换行**。cmd 按当前代码页逐字节解码脚本，UTF-8 中文会变成乱码；每个脚本第二行都有 `chcp 936` 兜底，保证从任何终端启动都能正确解析中文文件名与中文提示。代价是只能在装了中文代码页的 Windows 上运行。
 - **`.ps1` 必须存为 UTF-8 with BOM**。PowerShell 5.1 对无 BOM 的文件按 ANSI 解析，中文会变乱码。
 
 ---

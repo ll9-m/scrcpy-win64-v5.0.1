@@ -1,11 +1,12 @@
 @echo off
+chcp 936 >nul 2>&1
 setlocal EnableExtensions
 pushd "%~dp0" >nul 2>&1 || cd /d "%~dp0"
 set "BIN=%~dp0bin"
 set "ADB=%BIN%\adb.exe"
 set "SCRCPY=%BIN%\scrcpy.exe"
 set "SAVED=%~dp0config\phone.txt"
-rem Keep icon and server lookup independent of the working directory.
+rem 图标和服务端按 exe 所在目录查找，这里显式指定，不依赖当前工作目录
 set "SCRCPY_ICON_DIR=%BIN%"
 set "SCRCPY_SERVER_PATH=%BIN%\scrcpy-server"
 set "WAIT="
@@ -23,8 +24,7 @@ set "TARGET="
 set "UNAUTH="
 set "OFFLINE="
 
-rem Emulator instances (emulator-5554) are skipped: otherwise they are treated
-rem as a USB device and steal the session from the real phone.
+rem 跳过模拟器，否则它会被当成 USB 设备抢走这次投屏
 for /f "skip=1 tokens=1,2" %%a in ('"%ADB%" devices 2^>nul') do (
   if /i "%%b"=="device" (
     echo %%a | findstr /i /b /c:"emulator-" >nul || call :consider "%%a"
@@ -40,8 +40,7 @@ if defined USB (
   goto run
 )
 
-rem phone.txt may be missing, empty, or polluted by a BOM / stray blank lines.
-rem Only accept a line that is exactly IPv4:port.
+rem phone.txt 可能为空、被记事本写成带 BOM、或有空行，只接受严格合法的 IPv4:端口
 if exist "%SAVED%" for /f "usebackq delims=" %%t in ("%SAVED%") do (
   if not defined TARGET (
     echo %%t | findstr /r /c:"^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*:[0-9][0-9]*$" >nul && set "TARGET=%%t"
@@ -57,30 +56,30 @@ for /f "tokens=2,3" %%a in ('"%ADB%" mdns services 2^>nul') do if "%%a"=="_adb-t
 
 if defined WAIT (
   if defined UNAUTH if not defined HINTED (
-    echo USB debugging is unauthorized. Unlock the phone and tap "Allow".
+    echo USB 调试未授权：解锁手机，点弹窗里的「允许」
     set "HINTED=1"
   )
   if defined OFFLINE if not defined HINTED (
-    echo Device is offline. Reconnect USB or toggle wireless debugging.
+    echo 设备离线：重新插拔 USB，或关掉再打开一次无线调试
     set "HINTED=1"
   )
-  echo Waiting for phone...
+  echo 等待手机中...
   ping -n 16 127.0.0.1 >nul
   goto discover
 )
 
-echo No phone found. Check:
-echo 1. Phone and PC are on the same Wi-Fi
-echo 2. Wireless debugging is enabled on the phone
-echo 3. Run pair.bat first
-if defined UNAUTH echo USB debugging is unauthorized. Unlock the phone and tap "Allow".
-if defined OFFLINE echo Device is offline. Reconnect USB or toggle wireless debugging.
-echo Exiting in 5 seconds. Use mirror-wait.bat to keep waiting.
+echo 没有找到手机，请检查：
+echo 1. 手机和电脑在同一个 Wi-Fi
+echo 2. 手机的「无线调试」已经打开
+echo 3. 先运行一次「配对.bat」
+if defined UNAUTH echo USB 调试未授权：解锁手机，点弹窗里的「允许」
+if defined OFFLINE echo 设备离线：重新插拔 USB，或关掉再打开一次无线调试
+echo 5 秒后退出。想一直等待，请用「等待投屏.bat」
 ping -n 6 127.0.0.1 >nul
 exit /b 1
 
 :consider
-rem Network devices win over USB devices; keep the first one seen in each class.
+rem 网络设备优先于 USB 设备，同类只取第一个
 echo %~1 | findstr ":" >nul
 if not errorlevel 1 (
   if not defined SERIAL set "SERIAL=%~1"
@@ -108,22 +107,23 @@ exit /b 0
 
 :check_bin
 if exist "%SCRCPY%" goto check_adb
-echo ERROR: scrcpy.exe not found at:
-echo   %SCRCPY%
-echo The bin folder is incomplete. Re-extract the package.
+echo 错误：找不到 scrcpy.exe
+echo   期望位置：%SCRCPY%
+echo 请确认 bin 目录完整，或重新解压本程序包。
+pause
 exit /b 1
 :check_adb
 if exist "%ADB%" exit /b 0
 where adb >nul 2>&1
 if errorlevel 1 (
-  echo ERROR: adb.exe not found at:
-  echo   %ADB%
-  echo and no adb was found in PATH. Re-extract the package.
+  echo 错误：找不到 %ADB%
+  echo 系统 PATH 里也没有 adb，请重新解压本程序包。
+  pause
   exit /b 1
 )
 set "ADB=adb"
-echo WARNING: using adb from PATH instead of the bundled one.
-echo          A version mismatch may break pairing and device discovery.
+echo 警告：bin\adb.exe 不存在，改用系统 PATH 里的 adb。
+echo       版本不一致可能导致配对和发现异常。
 exit /b 0
 
 :run
